@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
-const navItems = [
+const navItemsGerente = [
   { href: '/logado/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/logado/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/logado/agendamentos', label: 'Agendamentos', icon: ClipboardList },
@@ -28,24 +28,31 @@ const navItems = [
   { href: '/logado/cadastros', label: 'Cadastros', icon: Users },
 ]
 
+const navItemsCliente = [
+  { href: '/logado/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/logado/agenda', label: 'Agenda', icon: CalendarDays },
+  { href: '/logado/agendamentos', label: 'Meus agendamentos', icon: ClipboardList },
+]
+
 export default function Sidebar() {
   const pathname = usePathname()
-  const { user, logout } = useUser()
+  const { user, logout, isGerente } = useUser()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const navItems = isGerente ? navItemsGerente : navItemsCliente
 
   const SidebarContent = () => (
     <aside className="flex flex-col h-full bg-sidebar border-r border-sidebar-border w-64">
-      {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
         <Link href="/logado/dashboard" className="font-sans text-xl font-bold text-primary">
           Sala Rosa
         </Link>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 py-4 px-3 overflow-y-auto">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
+
           return (
             <Link
               key={item.href}
@@ -65,7 +72,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* User info + logout */}
       <div className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
@@ -73,6 +79,7 @@ export default function Sidebar() {
               {user?.nome?.[0]?.toUpperCase() || 'U'}
             </span>
           </div>
+
           <div className="min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate font-body">
               {user?.nome || 'Usuário'}
@@ -82,6 +89,7 @@ export default function Sidebar() {
             </p>
           </div>
         </div>
+
         <button
           onClick={logout}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors font-body"
@@ -95,12 +103,10 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar */}
       <div className="hidden md:flex h-screen fixed left-0 top-0 z-30">
         <SidebarContent />
       </div>
 
-      {/* Mobile topbar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border h-14 flex items-center px-4 gap-4">
         <button
           onClick={() => setMobileOpen(true)}
@@ -112,7 +118,6 @@ export default function Sidebar() {
         <span className="font-sans text-lg font-bold text-primary">Sala Rosa</span>
       </div>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div
