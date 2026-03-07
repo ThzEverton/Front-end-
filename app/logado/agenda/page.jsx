@@ -16,8 +16,50 @@ import {
   X,
 } from 'lucide-react'
 
+function normalizeDateOnly(value) {
+  if (!value) return ''
+
+  if (typeof value === 'string') {
+    return value.slice(0, 10)
+  }
+
+  if (value instanceof Date) {
+    const ano = value.getFullYear()
+    const mes = String(value.getMonth() + 1).padStart(2, '0')
+    const dia = String(value.getDate()).padStart(2, '0')
+    return `${ano}-${mes}-${dia}`
+  }
+
+  return String(value).slice(0, 10)
+}
+
+function normalizeTime(value) {
+  if (!value) return ''
+  return String(value).slice(0, 8)
+}
+
 function getHoraSlot(slot) {
-  return slot?.slot || slot?.horario || slot?.hora || slot
+  return normalizeTime(slot?.slot || slot?.horario || slot?.hora || slot)
+}
+
+function isBloqueado(slot) {
+  return (
+    slot?.bloqueado === true ||
+    slot?.bloqueado === 1 ||
+    slot?.bloqueado === '1' ||
+    slot?.bloqueado === 'true' ||
+    slot?.status === 'bloqueado'
+  )
+}
+
+function isOcupado(slot) {
+  return (
+    slot?.ocupado === true ||
+    slot?.ocupado === 1 ||
+    slot?.ocupado === '1' ||
+    slot?.ocupado === 'true' ||
+    slot?.status === 'ocupado'
+  )
 }
 
 function ConfigModal({ config, onClose, onSave }) {
@@ -220,10 +262,41 @@ export default function AgendaPage() {
 
   async function fetchSlots(date) {
     setLoading(true)
+
     try {
-      const data = await apiClient.get(`/agenda/slots?date=${date}`)
-      setSlots(Array.isArray(data) ? data : data?.slots || [])
-    } catch {
+      const [slotsData, bloqueiosData] = await Promise.all([
+        apiClient.get(`/agenda/slots?date=${date}`),
+        apiClient.get('/agenda/bloqueios'),
+      ])
+
+      const slotsArray = Array.isArray(slotsData) ? slotsData : slotsData?.slots || []
+      const bloqueiosArray = Array.isArray(bloqueiosData) ? bloqueiosData : bloqueiosData?.bloqueios || []
+
+      const bloqueiosDoDia = bloqueiosArray.filter((b) => {
+        return normalizeDateOnly(b?.data) === date
+      })
+
+      const slotsFormatados = slotsArray.map((slot) => {
+        const horaSlot = getHoraSlot(slot)
+
+        const bloqueado = bloqueiosDoDia.some((b) => {
+          const horaBloqueio = normalizeTime(b?.slot)
+          return horaBloqueio === horaSlot
+        })
+
+        const ocupadoOriginal = isOcupado(slot)
+
+        return {
+          ...slot,
+          bloqueado,
+          ocupado: ocupadoOriginal,
+          status: bloqueado ? 'bloqueado' : ocupadoOriginal ? 'ocupado' : 'disponivel',
+        }
+      })
+
+      setSlots(slotsFormatados)
+    } catch (error) {
+      console.error('Erro ao buscar slots:', error)
       setSlots([])
     } finally {
       setLoading(false)
@@ -255,20 +328,48 @@ export default function AgendaPage() {
   }, [selectedDate])
 
   function changeDate(delta) {
-    const d = new Date(selectedDate + 'T00:00:00')
+    const [ano, mes, dia] = selectedDate.split('-').map(Number)
+    const d = new Date(ano, mes - 1, dia)
     d.setDate(d.getDate() + delta)
-    setSelectedDate(d.toISOString().split('T')[0])
+
+    const novoAno = d.getFullYear()
+    const novoMes = String(d.getMonth() + 1).padStart(2, '0')
+    const novoDia = String(d.getDate()).padStart(2, '0')
+
+    setSelectedDate(`${novoAno}-${novoMes}-${novoDia}`)
   }
 
   async function handleToggleBloqueio(slot) {
     try {
-      await apiClient.post('/agenda/bloqueios/toggle', {
+      const horaSlot = getHoraSlot(slot)
+
+      const resp = await apiClient.post('/agenda/bloqueios/toggle', {
         data: selectedDate,
-        slot: getHoraSlot(slot),
+        slot: horaSlot,
       })
-      toast.success('Horário atualizado!')
-      fetchSlots(selectedDate)
-    } catch {
+
+      setSlots((prev) =>
+        prev.map((item) => {
+          if (getHoraSlot(item) !== horaSlot) return item
+
+          const ocupado = isOcupado(item)
+
+          const bloqueado =
+            typeof resp?.bloqueado === 'boolean'
+              ? resp.bloqueado
+              : !isBloqueado(item)
+
+          return {
+            ...item,
+            bloqueado,
+            status: bloqueado ? 'bloqueado' : ocupado ? 'ocupado' : 'disponivel',
+          }
+        })
+      )
+
+      toast.success(resp?.msg || 'Horário atualizado!')
+    } catch (error) {
+      console.error('Erro ao atualizar bloqueio:', error)
       toast.error('Erro ao atualizar bloqueio.')
     }
   }
@@ -300,11 +401,11 @@ export default function AgendaPage() {
   }
 
   function slotColor(slot) {
-    if (slot?.bloqueado || slot?.status === 'bloqueado') {
+    if (isBloqueado(slot)) {
       return 'bg-muted text-muted-foreground border-border'
     }
 
-    if (slot?.ocupado || slot?.status === 'ocupado') {
+    if (isOcupado(slot)) {
       return 'bg-primary/10 text-primary border-primary/20'
     }
 
@@ -385,8 +486,8 @@ export default function AgendaPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {slots.map((slot, i) => {
-            const bloqueado = slot?.bloqueado || slot?.status === 'bloqueado'
-            const ocupado = slot?.ocupado || slot?.status === 'ocupado'
+            const bloqueado = isBloqueado(slot)
+            const ocupado = isOcupado(slot)
             const disponivel = !bloqueado && !ocupado
             const hora = getHoraSlot(slot)
 
