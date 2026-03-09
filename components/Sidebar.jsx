@@ -22,6 +22,7 @@ const navItemsGerente = [
   { href: '/logado/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/logado/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/logado/agendamentos', label: 'Agendamentos', icon: ClipboardList },
+  { href: '/logado/turmas', label: 'Turmas', icon: Users },
   { href: '/logado/vendas', label: 'Vendas', icon: ShoppingCart },
   { href: '/logado/estoque', label: 'Estoque', icon: Package },
   { href: '/logado/financeiro', label: 'Financeiro', icon: Wallet },
@@ -31,6 +32,7 @@ const navItemsGerente = [
 const navItemsCliente = [
   { href: '/logado/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/logado/agenda', label: 'Agenda', icon: CalendarDays },
+  { href: '/logado/turmas', label: 'Turmas', icon: Users },
   { href: '/logado/agendamentos', label: 'Meus agendamentos', icon: ClipboardList },
 ]
 
