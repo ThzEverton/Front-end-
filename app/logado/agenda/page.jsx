@@ -63,17 +63,80 @@ function isOcupado(slot) {
 }
 
 function ConfigModal({ config, onClose, onSave }) {
-  const [inicio, setInicio] = useState(config?.horaInicioPadrao?.slice(0, 5) || '08:00')
-  const [fim, setFim] = useState(config?.horaFimPadrao?.slice(0, 5) || '18:00')
+  const [inicioSemana, setInicioSemana] = useState(config?.horaInicioSemana?.slice(0, 5) || '08:00')
+  const [fimSemana, setFimSemana] = useState(config?.horaFimSemana?.slice(0, 5) || '18:00')
+  const [inicioFimSemana, setInicioFimSemana] = useState(
+    config?.horaInicioFimSemana?.slice(0, 5) || ''
+  )
+  const [fimFimSemana, setFimFimSemana] = useState(
+    config?.horaFimFimSemana?.slice(0, 5) || ''
+  )
   const [duracao, setDuracao] = useState(config?.duracaoSlotMinutos || 60)
   const [loading, setLoading] = useState(false)
 
+  function timeToMinutes(value) {
+    if (!value) return null
+    const [hora, minuto] = value.split(':').map(Number)
+    return hora * 60 + minuto
+  }
+
+  function validar() {
+    if (!inicioSemana || !fimSemana) {
+      toast.error('Preencha o horário de início e fim dos dias úteis.')
+      return false
+    }
+
+    const inicioSemanaMin = timeToMinutes(inicioSemana)
+    const fimSemanaMin = timeToMinutes(fimSemana)
+
+    if (fimSemanaMin <= inicioSemanaMin) {
+      toast.error('Nos dias úteis, o horário de fim deve ser maior que o horário de início.')
+      return false
+    }
+
+    const duracaoNumero = Number(duracao)
+
+    if (!duracaoNumero || duracaoNumero < 15) {
+      toast.error('A duração do slot deve ser de no mínimo 15 minutos.')
+      return false
+    }
+
+    if (duracaoNumero % 15 !== 0) {
+      toast.error('A duração do slot deve ser múltipla de 15 minutos.')
+      return false
+    }
+
+    const preencheuInicioFimSemana = !!inicioFimSemana
+    const preencheuFimFimSemana = !!fimFimSemana
+
+    if ((preencheuInicioFimSemana && !preencheuFimFimSemana) || (!preencheuInicioFimSemana && preencheuFimFimSemana)) {
+      toast.error('Para configurar fim de semana, preencha início e fim.')
+      return false
+    }
+
+    if (preencheuInicioFimSemana && preencheuFimFimSemana) {
+      const inicioFimSemanaMin = timeToMinutes(inicioFimSemana)
+      const fimFimSemanaMin = timeToMinutes(fimFimSemana)
+
+      if (fimFimSemanaMin <= inicioFimSemanaMin) {
+        toast.error('No fim de semana, o horário de fim deve ser maior que o horário de início.')
+        return false
+      }
+    }
+
+    return true
+  }
+
   async function handleSave() {
+    if (!validar()) return
+
     setLoading(true)
     try {
       await onSave({
-        horaInicioPadrao: inicio + ':00',
-        horaFimPadrao: fim + ':00',
+        horaInicioSemana: inicioSemana + ':00',
+        horaFimSemana: fimSemana + ':00',
+        horaInicioFimSemana: inicioFimSemana ? inicioFimSemana + ':00' : null,
+        horaFimFimSemana: fimFimSemana ? fimFimSemana + ':00' : null,
         duracaoSlotMinutos: Number(duracao),
       })
       onClose()
@@ -84,7 +147,7 @@ function ConfigModal({ config, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
-      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl animate-fade-in">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-sans text-lg font-bold text-card-foreground">
             Configurar Agenda
@@ -94,29 +157,72 @@ function ConfigModal({ config, onClose, onSave }) {
           </button>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium font-body mb-1.5">
-              Horário de início
-            </label>
-            <input
-              type="time"
-              value={inicio}
-              onChange={(e) => setInicio(e.target.value)}
-              className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-            />
+        <div className="flex flex-col gap-5">
+          <div className="border border-border rounded-xl p-4">
+            <p className="text-sm font-semibold font-body mb-3 text-card-foreground">
+              Segunda a sexta
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">
+                  Horário de início
+                </label>
+                <input
+                  type="time"
+                  value={inicioSemana}
+                  onChange={(e) => setInicioSemana(e.target.value)}
+                  className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">
+                  Horário de fim
+                </label>
+                <input
+                  type="time"
+                  value={fimSemana}
+                  onChange={(e) => setFimSemana(e.target.value)}
+                  className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium font-body mb-1.5">
-              Horário de fim
-            </label>
-            <input
-              type="time"
-              value={fim}
-              onChange={(e) => setFim(e.target.value)}
-              className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-            />
+          <div className="border border-border rounded-xl p-4">
+            <p className="text-sm font-semibold font-body mb-1 text-card-foreground">
+              Sábado e domingo
+            </p>
+            <p className="text-xs text-muted-foreground font-body mb-3">
+              Deixe vazio caso não atenda no fim de semana.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">
+                  Horário de início
+                </label>
+                <input
+                  type="time"
+                  value={inicioFimSemana}
+                  onChange={(e) => setInicioFimSemana(e.target.value)}
+                  className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">
+                  Horário de fim
+                </label>
+                <input
+                  type="time"
+                  value={fimFimSemana}
+                  onChange={(e) => setFimFimSemana(e.target.value)}
+                  className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+                />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -131,6 +237,9 @@ function ConfigModal({ config, onClose, onSave }) {
               onChange={(e) => setDuracao(e.target.value)}
               className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
+            <p className="text-xs text-muted-foreground font-body mt-1">
+              Use valores como 15, 30, 45 ou 60.
+            </p>
           </div>
         </div>
 
@@ -154,7 +263,6 @@ function ConfigModal({ config, onClose, onSave }) {
     </div>
   )
 }
-
 function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
   const [servicoId, setServicoId] = useState('')
   const [tipo, setTipo] = useState('individual')
