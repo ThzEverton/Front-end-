@@ -10,6 +10,8 @@ import {
   Clock3, X, Check, Ban, Copy,
 } from 'lucide-react'
 
+
+
 // ── Modal: detalhes da turma ──────────────────────────────────────────────────
 function DetalhesTurmaModal({ turmaId, onClose, isGerente, onAtualizar }) {
   const [loading, setLoading]   = useState(true)
@@ -69,7 +71,7 @@ function DetalhesTurmaModal({ turmaId, onClose, isGerente, onAtualizar }) {
                 <div>
                   <p className="font-medium text-card-foreground">{turma?.servico?.nome || 'Serviço'}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {formatDate(turma?.data)} · {formatTime(turma?.horaInicio)} às {formatTime(turma?.horaFim)}
+                    {turma?.data?.slice(8, 10)}/{turma?.data?.slice(5, 7)}/{turma?.data?.slice(0, 4)} · {turma?.horaInicio?.slice(0, 5)} às {turma?.horaFim?.slice(0, 5)}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     Status: <span className="font-medium">{turma?.status}</span>
@@ -304,7 +306,7 @@ function TurmaCard({ turma, isGerente, onVerDetalhes, onEntrar, onSair, onAprova
             <CalendarDays size={14} /> {formatDate(turma?.data)}
           </p>
           <p className="text-sm text-muted-foreground font-body mt-1 flex items-center gap-2">
-            <Clock3 size={14} /> {formatTime(turma?.horaInicio)} às {formatTime(turma?.horaFim)}
+          {turma?.data?.slice(8, 10)}/{turma?.data?.slice(5, 7)}/{turma?.data?.slice(0, 4)} · {turma?.horaInicio?.slice(0, 5)} às {turma?.horaFim?.slice(0, 5)}
           </p>
         </div>
         <StatusBadge status={turma?.status} />
