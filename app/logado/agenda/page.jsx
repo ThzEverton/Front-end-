@@ -266,9 +266,13 @@ function ConfigModal({ config, onClose, onSave }) {
 function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
   const [servicoId, setServicoId] = useState('')
   const [tipo, setTipo] = useState('individual')
+  const [passo, setPasso] = useState(1)   // 1 = escolha, 2 = turma
+  const [subTipo, setSubTipo] = useState('')  // 'nova' | 'codigo'
+  const [horaFim, setHoraFim] = useState('')
+  const [codigoConvite, setCodigo] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e) {
+  function handleProximo(e) {
     e.preventDefault()
 
     if (!servicoId) {
@@ -276,13 +280,47 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
       return
     }
 
+    if (tipo === 'turma') {
+      setPasso(2)
+      return
+    }
+
+    handleSubmit()
+  }
+
+  async function handleSubmit() {
     setLoading(true)
     try {
-      await onConfirm({ slot, data, servicoId, tipo })
+      await onConfirm({
+        slot,
+        data,
+        servicoId,
+        tipo,
+        horaFim: horaFim || null,
+        subTipo,
+        codigoConvite,
+      })
       onClose()
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleConfirmarTurma(e) {
+    e.preventDefault()
+
+    if (!subTipo) {
+      toast.error('Escolha uma opção.')
+      return
+    }
+
+    if (subTipo === 'codigo' && !codigoConvite.trim()) {
+      toast.error('Informe o código da turma.')
+      return
+    }
+
+    // Removida validação de horaFim — calculado automaticamente no handleAgendar
+    await handleSubmit()
   }
 
   return (
@@ -290,7 +328,7 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
       <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl animate-fade-in">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-sans text-lg font-bold text-card-foreground">
-            Agendar Horário
+            {passo === 1 ? 'Agendar horário' : 'Entrar em turma'}
           </h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X size={18} />
@@ -301,58 +339,138 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
           {formatDate(data)} às {getHoraSlot(slot)}
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium font-body mb-1.5">
-              Serviço
-            </label>
-            <select
-              value={servicoId}
-              onChange={(e) => setServicoId(e.target.value)}
-              required
-              className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-            >
-              <option value="">Selecione um serviço...</option>
-              {servicos.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* ── PASSO 1: serviço + tipo ── */}
+        {passo === 1 && (
+          <form onSubmit={handleProximo} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium font-body mb-1.5">Serviço</label>
+              <select
+                value={servicoId}
+                onChange={(e) => setServicoId(e.target.value)}
+                required
+                className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+              >
+                <option value="">Selecione um serviço...</option>
+                {servicos.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nome}</option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium font-body mb-1.5">
-              Tipo de atendimento
-            </label>
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-            >
-              <option value="individual">Individual</option>
-              <option value="turma">Turma</option>
-            </select>
-          </div>
+            <div>
+              <label className="block text-sm font-medium font-body mb-1.5">
+                Tipo de atendimento
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {['individual', 'turma'].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTipo(t)}
+                    className={`py-2.5 rounded-lg border text-sm font-body transition-colors capitalize
+                      ${tipo === t
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                  >
+                    {t === 'individual' ? 'Individual' : 'Turma'}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="flex gap-3 mt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 border border-border py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {loading && <Loader2 size={14} className="animate-spin" />}
-              Confirmar
-            </button>
-          </div>
-        </form>
+            <div className="flex gap-3 mt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 border border-border py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 size={14} className="animate-spin" />}
+                {tipo === 'turma' ? 'Próximo →' : 'Confirmar'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ── PASSO 2: opções de turma ── */}
+        {passo === 2 && (
+          <form onSubmit={handleConfirmarTurma} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium font-body mb-2">
+                O que deseja fazer?
+              </label>
+              <div className="flex flex-col gap-2">
+                {[
+                  { val: 'nova', label: 'Criar nova turma', desc: 'Vai para aprovação da gerente' },
+                  { val: 'codigo', label: 'Entrar com código de convite', desc: 'Informe o código que recebeu' },
+                ].map((op) => (
+                  <button
+                    key={op.val}
+                    type="button"
+                    onClick={() => setSubTipo(op.val)}
+                    className={`text-left px-4 py-3 rounded-lg border text-sm font-body transition-colors
+                      ${subTipo === op.val
+                        ? 'border-primary bg-primary/5 text-card-foreground'
+                        : 'border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                  >
+                    <p className="font-medium text-card-foreground">{op.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{op.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Campo extra: hora fim (nova turma) */}
+            {subTipo === 'nova' && (
+              <p className="text-xs text-muted-foreground font-body bg-muted px-3 py-2 rounded-lg">
+                A turma terá duração de 2 horas. Ficará pendente até a gerente aprovar.
+              </p>
+            )}
+
+            {/* Campo extra: código (entrar por código) */}
+            {subTipo === 'codigo' && (
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">
+                  Código da turma
+                </label>
+                <input
+                  type="text"
+                  value={codigoConvite}
+                  onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                  placeholder="Ex: A1B2C3D4"
+                  maxLength={8}
+                  className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body tracking-widest uppercase"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => { setPasso(1); setSubTipo('') }}
+                className="flex-1 border border-border py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
+              >
+                ← Voltar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !subTipo}
+                className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 size={14} className="animate-spin" />}
+                Confirmar
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )
@@ -493,18 +611,45 @@ export default function AgendaPage() {
     }
   }
 
-  async function handleAgendar({ slot, data, servicoId, tipo }) {
+  async function handleAgendar({ slot, data, servicoId, tipo, subTipo, codigoConvite }) {
     try {
-      await apiClient.post('/agendamentos', {
-        data,
-        horaInicio: getHoraSlot(slot),
-        servicoId,
-        tipo,
-      })
-      toast.success('Agendamento realizado!')
+      if (tipo === 'turma') {
+        if (subTipo === 'nova') {
+          const horaInicio = getHoraSlot(slot)
+
+          // Calcula hora fim = hora início + 2 horas automaticamente
+          const [h, m, s] = horaInicio.split(':').map(Number)
+          const base = new Date(1970, 0, 1, h, m, s || 0)
+          base.setHours(base.getHours() + 2)
+          const horaFim = base.toTimeString().slice(0, 8)
+
+          const resp = await apiClient.post('/turmas', {
+            servicoId: Number(servicoId),
+            data,
+            horaInicio,
+            horaFim,
+          })
+
+          toast.success(`Turma criada! Código: ${resp.codigoConvite} — aguardando aprovação.`)
+
+        } else if (subTipo === 'codigo') {
+        await apiClient.post(`/turmas/convites/${codigoConvite.trim().toUpperCase()}/aceitar`)
+          toast.success('Você entrou na turma com sucesso!')
+        }
+
+      } else {
+        await apiClient.post('/agendamentos', {
+          data,
+          horaInicio: getHoraSlot(slot),
+          servicoId: Number(servicoId),
+        })
+        toast.success('Agendamento realizado!')
+      }
+
       fetchSlots(selectedDate)
-    } catch {
-      toast.error('Erro ao realizar agendamento.')
+    } catch (error) {
+      const msg = error?.response?.data?.msg || error?.message || 'Erro ao realizar agendamento.'
+      toast.error(msg)
     }
   }
 
