@@ -163,23 +163,130 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
 
   const [loading, setLoading] = useState(false)
 
+  function somenteNumeros(valor) {
+    return String(valor || '').replace(/\D/g, '')
+  }
+
+  function validarEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim())
+  }
+
+  function validarTelefone(telefone) {
+    const numeros = somenteNumeros(telefone)
+    return numeros.length === 10 || numeros.length === 11
+  }
+
+  function validarDataNascimento(data) {
+    if (!data) return true
+
+    const hoje = new Date()
+    const dataInformada = new Date(`${data}T00:00:00`)
+
+    if (Number.isNaN(dataInformada.getTime())) return false
+    if (dataInformada > hoje) return false
+
+    return true
+  }
+
+  function validarFormulario() {
+    const nome = String(form.nome || '').trim()
+    const email = String(form.email || '').trim()
+    const telefone = String(form.telefone || '').trim()
+    const senha = String(form.senha || '').trim()
+    const perfil = String(form.perfil || '').trim().toLowerCase()
+
+    if (!nome) {
+      toast.error('Informe o nome.')
+      return false
+    }
+
+    if (nome.length < 3) {
+      toast.error('O nome deve ter pelo menos 3 caracteres.')
+      return false
+    }
+
+    if (nome.length > 120) {
+      toast.error('O nome deve ter no máximo 120 caracteres.')
+      return false
+    }
+
+    if (!email) {
+      toast.error('Informe o e-mail.')
+      return false
+    }
+
+    if (!validarEmail(email)) {
+      toast.error('Informe um e-mail válido.')
+      return false
+    }
+
+    if (email.length > 180) {
+      toast.error('O e-mail deve ter no máximo 180 caracteres.')
+      return false
+    }
+
+    if (telefone && !validarTelefone(telefone)) {
+      toast.error('Informe um telefone válido com DDD.')
+      return false
+    }
+
+    if (form.dataNascimento && !validarDataNascimento(form.dataNascimento)) {
+      toast.error('Informe uma data de nascimento válida.')
+      return false
+    }
+
+    if (!perfil) {
+      toast.error('Selecione o perfil.')
+      return false
+    }
+
+    if (perfil !== 'cliente' && perfil !== 'gerente') {
+      toast.error('Perfil inválido.')
+      return false
+    }
+
+    if (!isEdit && !senha) {
+      toast.error('Informe a senha.')
+      return false
+    }
+
+    if (senha && senha.length < 3) {
+      toast.error('A senha deve ter pelo menos 3 caracteres.')
+      return false
+    }
+
+    if (senha && senha.length > 255) {
+      toast.error('A senha deve ter no máximo 255 caracteres.')
+      return false
+    }
+
+    return true
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
+
+    if (!validarFormulario()) {
+      return
+    }
+
     setLoading(true)
 
     try {
       const payload = {
-        nome: form.nome,
-        email: form.email,
-        telefone: form.telefone || null,
+        nome: String(form.nome || '').trim(),
+        email: String(form.email || '').trim().toLowerCase(),
+        telefone: String(form.telefone || '').trim() || null,
         dataNascimento: form.dataNascimento || null,
-        perfil: form.perfil,
-        isConsultora: form.isConsultora,
-        ativo: form.ativo,
+        perfil: String(form.perfil || '').trim().toLowerCase(),
+        isConsultora: !!form.isConsultora,
+        ativo: !!form.ativo,
       }
 
-      if (form.senha) {
-        payload.senha = form.senha
+      const senha = String(form.senha || '').trim()
+
+      if (senha) {
+        payload.senha = senha
       }
 
       if (isEdit) {
@@ -188,7 +295,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
       } else {
         await apiClient.post('/users', {
           ...payload,
-          senha: form.senha,
+          senha,
         })
         toast.success('Usuário cadastrado!')
       }
@@ -197,7 +304,24 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
       onClose()
     } catch (error) {
       console.error(error)
-      toast.error('Erro ao salvar usuário.')
+
+      const msg =
+        error?.response?.data?.msg ||
+        error?.response?.data?.message ||
+        error?.message ||
+        ''
+
+      if (
+        msg.toLowerCase().includes('email') &&
+        (msg.toLowerCase().includes('exists') ||
+          msg.toLowerCase().includes('duplic') ||
+          msg.toLowerCase().includes('já existe') ||
+          msg.toLowerCase().includes('existente'))
+      ) {
+        toast.error('Já existe um usuário com esse e-mail.')
+      } else {
+        toast.error(msg || 'Erro ao salvar usuário.')
+      }
     } finally {
       setLoading(false)
     }
@@ -210,7 +334,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
           <h3 className="font-sans text-lg font-bold">
             {isEdit ? 'Editar Usuário' : 'Novo Usuário'}
           </h3>
-          <button onClick={onClose}>
+          <button type="button" onClick={onClose}>
             <X size={18} className="text-muted-foreground" />
           </button>
         </div>
@@ -221,6 +345,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
             <input
               value={form.nome}
               onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))}
+              maxLength={120}
               required
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
@@ -232,6 +357,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
               type="email"
               value={form.email}
               onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              maxLength={180}
               required
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
@@ -242,6 +368,8 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
             <input
               value={form.telefone}
               onChange={(e) => setForm((p) => ({ ...p, telefone: e.target.value }))}
+              maxLength={20}
+              placeholder="(18) 99999-9999"
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
           </div>
@@ -252,6 +380,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
               type="date"
               value={form.dataNascimento}
               onChange={(e) => setForm((p) => ({ ...p, dataNascimento: e.target.value }))}
+              max={new Date().toISOString().split('T')[0]}
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
           </div>
@@ -261,6 +390,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
             <select
               value={form.perfil}
               onChange={(e) => setForm((p) => ({ ...p, perfil: e.target.value }))}
+              required
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             >
               <option value="cliente">Cliente</option>
@@ -278,6 +408,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
               onChange={(e) => setForm((p) => ({ ...p, senha: e.target.value }))}
               required={!isEdit}
               minLength={3}
+              maxLength={255}
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
           </div>
@@ -346,6 +477,17 @@ function ServicosTab() {
     }
   }
 
+  async function toggleAtivo(id) {
+    try {
+      await apiClient.patch(`/servicos/${id}/toggle-ativo`)
+      toast.success('Status atualizado!')
+      fetchServicos()
+    } catch (error) {
+      console.error(error)
+      toast.error('Erro ao atualizar status.')
+    }
+  }
+
   useEffect(() => {
     fetchServicos()
   }, [])
@@ -393,17 +535,30 @@ function ServicosTab() {
                 <tr key={s?.id || i} className="border-t border-border hover:bg-muted/30">
                   <td className="px-4 py-2.5 font-medium">{s.nome}</td>
                   <td className="px-4 py-2.5">{s.descricao || '-'}</td>
-                  <td className="px-4 py-2.5">
-                    R$ {Number(s.preco || 0).toFixed(2)}
-                  </td>
+                  <td className="px-4 py-2.5">R$ {Number(s.preco || 0).toFixed(2)}</td>
                   <td className="px-4 py-2.5">
                     {s.duracaoMin ? `${s.duracaoMin} min` : '-'}
                   </td>
                   <td className="px-4 py-2.5">
-                    {s.exclusivoParaConsultora == 1 || s.exclusivoParaConsultora === true ? 'Sim' : 'Não'}
+                    {s.exclusivoParaConsultora == 1 || s.exclusivoParaConsultora === true
+                      ? 'Sim'
+                      : 'Não'}
                   </td>
                   <td className="px-4 py-2.5">
-                    {s.ativo == 1 || s.ativo === true ? 'Sim' : 'Não'}
+                    <button
+                      onClick={() => toggleAtivo(s.id)}
+                      className="flex items-center gap-1 text-xs"
+                    >
+                      {s.ativo !== false && s.ativo !== 0 ? (
+                        <>
+                          <ToggleRight size={18} className="text-green-600" /> Ativo
+                        </>
+                      ) : (
+                        <>
+                          <ToggleLeft size={18} className="text-muted-foreground" /> Inativo
+                        </>
+                      )}
+                    </button>
                   </td>
                   <td className="px-4 py-2.5">
                     <button
@@ -446,14 +601,98 @@ function ServicoModal({ servico, onClose, onSalvo }) {
 
   const [loading, setLoading] = useState(false)
 
+  function validarFormulario() {
+    const nome = String(form.nome || '').trim()
+    const descricao = String(form.descricao || '').trim()
+    const preco = Number(form.preco)
+    const duracao = Number(form.duracaoMin)
+
+    if (!nome) {
+      toast.error('Informe o nome do serviço.')
+      return false
+    }
+
+    if (nome.length < 3) {
+      toast.error('O nome do serviço deve ter pelo menos 3 caracteres.')
+      return false
+    }
+
+    if (nome.length > 120) {
+      toast.error('O nome do serviço deve ter no máximo 120 caracteres.')
+      return false
+    }
+
+    if (descricao.length > 500) {
+      toast.error('A descrição deve ter no máximo 500 caracteres.')
+      return false
+    }
+
+    if (form.preco === '' || form.preco === null || form.preco === undefined) {
+      toast.error('Informe o preço do serviço.')
+      return false
+    }
+
+    if (Number.isNaN(preco)) {
+      toast.error('Informe um preço válido.')
+      return false
+    }
+
+    if (preco <= 0) {
+      toast.error('O preço do serviço deve ser maior que zero.')
+      return false
+    }
+
+    if (preco > 999999.99) {
+      toast.error('O preço do serviço está muito alto.')
+      return false
+    }
+
+    if (form.duracaoMin === '' || form.duracaoMin === null || form.duracaoMin === undefined) {
+      toast.error('Informe a duração do serviço.')
+      return false
+    }
+
+    if (Number.isNaN(duracao)) {
+      toast.error('Informe uma duração válida.')
+      return false
+    }
+
+    if (!Number.isInteger(duracao)) {
+      toast.error('A duração do serviço deve ser um número inteiro.')
+      return false
+    }
+
+    if (duracao < 15) {
+      toast.error('A duração mínima do serviço é de 15 minutos.')
+      return false
+    }
+
+    if (duracao > 1440) {
+      toast.error('A duração do serviço está inválida.')
+      return false
+    }
+
+    if (duracao % 5 !== 0) {
+      toast.error('A duração do serviço deve ser múltipla de 5 minutos.')
+      return false
+    }
+
+    return true
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
+
+    if (!validarFormulario()) {
+      return
+    }
+
     setLoading(true)
 
     try {
       const payload = {
-        nome: form.nome,
-        descricao: form.descricao,
+        nome: form.nome.trim(),
+        descricao: form.descricao.trim(),
         preco: Number(form.preco),
         duracaoMin: Number(form.duracaoMin),
         ativo: form.ativo ? 1 : 0,
@@ -485,7 +724,7 @@ function ServicoModal({ servico, onClose, onSalvo }) {
           <h3 className="font-sans text-lg font-bold">
             {isEdit ? 'Editar Serviço' : 'Novo Serviço'}
           </h3>
-          <button onClick={onClose}>
+          <button type="button" onClick={onClose}>
             <X size={18} className="text-muted-foreground" />
           </button>
         </div>
@@ -497,6 +736,7 @@ function ServicoModal({ servico, onClose, onSalvo }) {
               value={form.nome}
               onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))}
               required
+              maxLength={120}
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
           </div>
@@ -507,6 +747,7 @@ function ServicoModal({ servico, onClose, onSalvo }) {
               value={form.descricao}
               onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))}
               rows={2}
+              maxLength={500}
               className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
           </div>
@@ -516,6 +757,7 @@ function ServicoModal({ servico, onClose, onSalvo }) {
             <input
               type="number"
               step="0.01"
+              min="0.01"
               value={form.preco}
               onChange={(e) => setForm((p) => ({ ...p, preco: e.target.value }))}
               required
@@ -527,6 +769,8 @@ function ServicoModal({ servico, onClose, onSalvo }) {
             <label className="block text-sm font-medium font-body mb-1">Duração (min)</label>
             <input
               type="number"
+              min="15"
+              step="5"
               value={form.duracaoMin}
               onChange={(e) => setForm((p) => ({ ...p, duracaoMin: e.target.value }))}
               required
@@ -616,12 +860,48 @@ function SlotsTab() {
       return
     }
 
+    const hoje = new Date()
+    const hojeString = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+      .toISOString()
+      .slice(0, 10)
+
+    if (data < hojeString) {
+      toast.error('Não é permitido cadastrar exceção para data passada.')
+      return
+    }
+
+    const temInicio = !!horarioInicio
+    const temFim = !!horarioFim
+
+    if (!temInicio && !temFim) {
+      toast.error('Informe o horário de início e fim da exceção.')
+      return
+    }
+
+    if ((temInicio && !temFim) || (!temInicio && temFim)) {
+      toast.error('Preencha horário de início e fim.')
+      return
+    }
+
+    function timeToMinutes(value) {
+      const [hora, minuto] = value.split(':').map(Number)
+      return hora * 60 + minuto
+    }
+
+    const inicioMin = timeToMinutes(horarioInicio)
+    const fimMin = timeToMinutes(horarioFim)
+
+    if (fimMin <= inicioMin) {
+      toast.error('O horário de fim deve ser maior que o horário de início.')
+      return
+    }
+
     setSaving(true)
     try {
       await apiClient.post('/agenda/excecoes', {
         data,
-        horaInicioExcecao: horarioInicio ? horarioInicio + ':00' : null,
-        horaFimExcecao: horarioFim ? horarioFim + ':00' : null,
+        horaInicioExcecao: horarioInicio + ':00',
+        horaFimExcecao: horarioFim + ':00',
       })
 
       toast.success('Exceção adicionada!')
@@ -665,6 +945,7 @@ function SlotsTab() {
             value={data}
             onChange={(e) => setData(e.target.value)}
             required
+            min={new Date().toISOString().slice(0, 10)}
             className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
           />
         </div>
@@ -710,10 +991,7 @@ function SlotsTab() {
       ) : (
         <div className="flex flex-col gap-2">
           {excecoes.map((ex, i) => {
-            const dataFormatada = ex?.data
-              ? new Date(ex.data).toLocaleDateString('pt-BR')
-              : ''
-
+            const dataFormatada = ex?.data ? new Date(ex.data).toLocaleDateString('pt-BR') : ''
             const inicio = ex?.horaInicioExcecao?.slice(0, 5)
             const fim = ex?.horaFimExcecao?.slice(0, 5)
 
@@ -723,9 +1001,7 @@ function SlotsTab() {
                 className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3"
               >
                 <div>
-                  <span className="font-medium font-body text-sm">
-                    {dataFormatada}
-                  </span>
+                  <span className="font-medium font-body text-sm">{dataFormatada}</span>
 
                   {(inicio || fim) && (
                     <span className="text-xs text-muted-foreground ml-3 font-body">
@@ -745,6 +1021,280 @@ function SlotsTab() {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Produtos  ───────────────────────────────────────────────────────────────
+
+function ProdutosTabSimples() {
+  const [produtos, setProdutos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState(null)
+
+  async function fetch() {
+    setLoading(true)
+    try {
+      const data = await apiClient.get('/produtos')
+      setProdutos(Array.isArray(data) ? data : data?.produtos || [])
+    } catch (error) {
+      console.error(error)
+      setProdutos([])
+      toast.error('Erro ao carregar produtos.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetch()
+  }, [])
+
+  async function handleSave(form) {
+    const payload = {
+      nome: form.nome,
+      precoVenda: Number(form.preco),
+      estoqueAtual: Number(form.estoqueAtual || 0),
+      estoqueMinimo: Number(form.estoqueMinimo || 0),
+    }
+
+    try {
+      if (form.id) {
+        await apiClient.put(`/produtos/${form.id}`, payload)
+        toast.success('Produto atualizado!')
+      } else {
+        await apiClient.post('/produtos', payload)
+        toast.success('Produto cadastrado!')
+      }
+
+      fetch()
+      setModal(null)
+    } catch (error) {
+      console.error('ERRO AO SALVAR PRODUTO:', error)
+      console.error('RESPOSTA BACK:', error?.response?.data)
+      toast.error(
+        error?.response?.data?.msg ||
+          error?.response?.data?.message ||
+          'Erro ao salvar produto.'
+      )
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-sm text-muted-foreground font-body">{produtos.length} produto(s)</p>
+        <button
+          onClick={() => setModal({})}
+          className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-body hover:opacity-90"
+        >
+          <Plus size={14} /> Novo produto
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="animate-spin text-primary" size={24} />
+        </div>
+      ) : produtos.length === 0 ? (
+        <p className="text-center py-10 text-muted-foreground font-body">Nenhum produto.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm font-body">
+            <thead className="bg-muted/50">
+              <tr className="text-xs text-muted-foreground uppercase text-left">
+                <th className="px-4 py-2">Nome</th>
+                <th className="px-4 py-2">Preço</th>
+                <th className="px-4 py-2">Estoque</th>
+                <th className="px-4 py-2">Ações</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {produtos.map((p, i) => (
+                <tr key={p?.id || i} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-4 py-2.5 font-medium">{p.nome}</td>
+                  <td className="px-4 py-2.5">
+                    R$ {Number(p.precoVenda ?? p.preco_venda ?? p.preco ?? p.valor ?? 0).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5">{p?.estoqueAtual ?? p?.estoque_atual ?? 0}</td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => setModal(p)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {modal !== null && (
+        <ProdutoSimpleModal
+          produto={modal?.id ? modal : null}
+          onClose={() => setModal(null)}
+          onSalvo={(form) =>
+            handleSave({ ...(modal?.id ? { id: modal.id } : {}), ...form })
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+function ProdutoSimpleModal({ produto, onClose, onSalvo }) {
+  const isEdit = !!produto?.id
+
+  const [form, setForm] = useState({
+    nome: produto?.nome || '',
+    preco: produto?.precoVenda ?? produto?.preco_venda ?? produto?.preco ?? produto?.valor ?? '',
+    estoqueAtual: produto?.estoqueAtual ?? produto?.estoque_atual ?? '',
+    estoqueMinimo: produto?.estoqueMinimo ?? produto?.estoque_minimo ?? '',
+  })
+
+  const [loading, setLoading] = useState(false)
+
+  function validarFormulario() {
+    const nome = form.nome.trim()
+    const preco = Number(form.preco)
+    const estoqueAtual = Number(form.estoqueAtual)
+    const estoqueMinimo = form.estoqueMinimo === '' ? null : Number(form.estoqueMinimo)
+
+    if (!nome) {
+      toast.error('Informe o nome do produto.')
+      return false
+    }
+
+    if (nome.length < 2) {
+      toast.error('Nome deve ter pelo menos 2 caracteres.')
+      return false
+    }
+
+    if (nome.length > 120) {
+      toast.error('Nome deve ter no máximo 120 caracteres.')
+      return false
+    }
+
+    if (form.preco === '') {
+      toast.error('Informe o preço.')
+      return false
+    }
+
+    if (isNaN(preco) || preco <= 0) {
+      toast.error('Preço deve ser maior que zero.')
+      return false
+    }
+
+    if (preco > 999999) {
+      toast.error('Preço muito alto.')
+      return false
+    }
+
+    if (form.estoqueAtual === '') {
+      toast.error('Informe o estoque atual.')
+      return false
+    }
+
+    if (isNaN(estoqueAtual) || estoqueAtual < 0) {
+      toast.error('Estoque atual inválido.')
+      return false
+    }
+
+    if (estoqueMinimo !== null) {
+      if (isNaN(estoqueMinimo) || estoqueMinimo < 0) {
+        toast.error('Estoque mínimo inválido.')
+        return false
+      }
+
+      if (estoqueMinimo > estoqueAtual) {
+        toast.error('Estoque mínimo não pode ser maior que o atual.')
+        return false
+      }
+    }
+
+    return true
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+
+    if (!validarFormulario()) return
+
+    setLoading(true)
+
+    try {
+      const payload = {
+        nome: form.nome.trim(),
+        preco: Number(form.preco),
+        estoqueAtual: Number(form.estoqueAtual),
+        estoqueMinimo: form.estoqueMinimo === '' ? null : Number(form.estoqueMinimo),
+      }
+
+      await onSalvo(payload)
+    } catch (error) {
+      console.error(error)
+      toast.error('Erro ao salvar produto.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
+      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl animate-fade-in">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-sans text-lg font-bold">
+            {isEdit ? 'Editar' : 'Novo'} Produto
+          </h3>
+          <button type="button" onClick={onClose}>
+            <X size={18} className="text-muted-foreground" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {[
+            ['nome', 'Nome'],
+            ['preco', 'Preço'],
+            ['estoqueAtual', 'Estoque atual'],
+            ['estoqueMinimo', 'Estoque mínimo'],
+          ].map(([k, l]) => (
+            <div key={k}>
+              <label className="block text-sm font-medium font-body mb-1">{l}</label>
+              <input
+                value={form[k]}
+                onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))}
+                required={k !== 'estoqueMinimo'}
+                type={k !== 'nome' ? 'number' : 'text'}
+                step={k === 'preco' ? '0.01' : '1'}
+                className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+              />
+            </div>
+          ))}
+
+          <div className="flex gap-3 mt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-border py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              Salvar
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
@@ -798,206 +1348,6 @@ export default function CadastrosPage() {
 
       <div className="bg-card border border-border rounded-xl p-5 animate-fade-in">
         {tabContent[aba]}
-      </div>
-    </div>
-  )
-}
-
-// ─── Produtos  ──
-
-function ProdutosTabSimples() {
-  const [produtos, setProdutos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null)
-
-  async function fetch() {
-    setLoading(true)
-    try {
-      const data = await apiClient.get('/produtos')
-      setProdutos(Array.isArray(data) ? data : data?.produtos || [])
-    } catch (error) {
-      console.error(error)
-      setProdutos([])
-      toast.error('Erro ao carregar produtos.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetch()
-  }, [])
-
-  async function handleSave(form) {
-    const payload = {
-      nome: form.nome,
-      precoVenda: Number(form.preco),
-      estoqueAtual: Number(form.estoqueAtual || 0),
-      estoqueMinimo: Number(form.estoqueMinimo || 0),
-    }
-
-    try {
-      if (form.id) {
-        await apiClient.put(`/produtos/${form.id}`, payload)
-        toast.success('Produto atualizado!')
-      } else {
-        await apiClient.post('/produtos', payload)
-        toast.success('Produto cadastrado!')
-      }
-
-      fetch()
-      setModal(null)
-    } catch (error) {
-      console.error('ERRO AO SALVAR PRODUTO:', error)
-      console.error('RESPOSTA BACK:', error?.response?.data)
-      toast.error(
-        error?.response?.data?.msg ||
-        error?.response?.data?.message ||
-        'Erro ao salvar produto.'
-      )
-    }
-  }
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <p className="text-sm text-muted-foreground font-body">{produtos.length} produto(s)</p>
-        <button
-          onClick={() => setModal({})}
-          className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-body hover:opacity-90"
-        >
-          <Plus size={14} /> Novo produto
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="animate-spin text-primary" size={24} />
-        </div>
-      ) : produtos.length === 0 ? (
-        <p className="text-center py-10 text-muted-foreground font-body">Nenhum produto.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm font-body">
-            <thead className="bg-muted/50">
-              <tr className="text-xs text-muted-foreground uppercase text-left">
-                <th className="px-4 py-2">Nome</th>
-                <th className="px-4 py-2">Preço</th>
-                <th className="px-4 py-2">Estoque</th>
-                <th className="px-4 py-2">Ações</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {produtos.map((p, i) => (
-                <tr key={p?.id || i} className="border-t border-border hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-medium">{p.nome}</td>
-                  <td className="px-4 py-2.5">
-                    R$ {Number(p.precoVenda ?? p.preco_venda ?? p.preco ?? p.valor ?? 0).toFixed(2)}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {p?.estoqueAtual ?? p?.estoque_atual ?? 0}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => setModal(p)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {modal !== null && (
-        <ProdutoSimpleModal
-          produto={modal?.id ? modal : null}
-          onClose={() => setModal(null)}
-          onSalvo={(form) =>
-            handleSave({ ...(modal?.id ? { id: modal.id } : {}), ...form })
-          }
-        />
-      )}
-    </div>
-  )
-}
-
-function ProdutoSimpleModal({ produto, onClose, onSalvo }) {
-  const [form, setForm] = useState({
-    nome: produto?.nome || '',
-    preco: produto?.precoVenda ?? produto?.preco_venda ?? produto?.preco ?? produto?.valor ?? '',
-    estoqueAtual: produto?.estoqueAtual ?? produto?.estoque_atual ?? '',
-    estoqueMinimo: produto?.estoqueMinimo ?? produto?.estoque_minimo ?? '',
-  })
-
-  const [loading, setLoading] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setLoading(true)
-    try {
-      await onSalvo(form)
-    } catch (error) {
-      console.error(error)
-      toast.error('Erro ao salvar produto.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
-      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl animate-fade-in">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-sans text-lg font-bold">
-            {produto ? 'Editar' : 'Novo'} Produto
-          </h3>
-          <button onClick={onClose}>
-            <X size={18} className="text-muted-foreground" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {[
-            ['nome', 'Nome'],
-            ['preco', 'Preço'],
-            ['estoqueAtual', 'Estoque atual'],
-            ['estoqueMinimo', 'Estoque mínimo'],
-          ].map(([k, l]) => (
-            <div key={k}>
-              <label className="block text-sm font-medium font-body mb-1">{l}</label>
-              <input
-                value={form[k]}
-                onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))}
-                required={k !== 'estoqueMinimo'}
-                type={k !== 'nome' ? 'number' : 'text'}
-                step={k === 'preco' ? '0.01' : '1'}
-                className="w-full border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-              />
-            </div>
-          ))}
-
-          <div className="flex gap-3 mt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 border border-border py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {loading && <Loader2 size={14} className="animate-spin" />} Salvar
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   )
