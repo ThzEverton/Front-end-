@@ -823,7 +823,7 @@ function ServicoModal({ servico, onClose, onSalvo }) {
     </div>
   )
 }
-//exe diasssss
+// SlotsTab — exceções de horário
 function SlotsTab() {
   const [excecoes, setExcecoes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -831,15 +831,28 @@ function SlotsTab() {
   const [horarioInicio, setHorarioInicio] = useState('')
   const [horarioFim, setHorarioFim] = useState('')
   const [saving, setSaving] = useState(false)
-
   const [recorrente, setRecorrente] = useState(false)
   const [diasSemana, setDiasSemana] = useState([])
+
+  function normalizar(ex) {
+  return {
+    id:               ex.id,         // ← vem certo do backend
+    data:             ex.data,
+    horaInicioExcecao: ex.horaInicioExcecao ?? ex.hora_inicio_excecao,
+    horaFimExcecao:   ex.horaFimExcecao    ?? ex.hora_fim_excecao,
+    recorrente:       ex.recorrente        ?? ex.recorrente,  // ← isso é inútil mas ok
+    diasSemana:       ex.diasSemana        ?? ex.dias_semana,
+    ativo:            ex.ativo,
+  }
+}
 
   async function fetchExcecoes() {
     setLoading(true)
     try {
       const d = await apiClient.get('/agenda/excecoes')
-      setExcecoes(Array.isArray(d) ? d : d?.excecoes || [])
+      const lista = Array.isArray(d) ? d : d?.excecoes || []
+      console.log('exceções brutas da API:', lista)
+      setExcecoes(lista.map(normalizar))
     } catch (error) {
       console.error(error)
       setExcecoes([])
@@ -876,16 +889,8 @@ function SlotsTab() {
       return
     }
 
-    const temInicio = !!horarioInicio
-    const temFim = !!horarioFim
-
-    if (!temInicio && !temFim) {
+    if (!horarioInicio || !horarioFim) {
       toast.error('Informe o horário de início e fim da exceção.')
-      return
-    }
-
-    if ((temInicio && !temFim) || (!temInicio && temFim)) {
-      toast.error('Preencha horário de início e fim.')
       return
     }
 
@@ -894,10 +899,7 @@ function SlotsTab() {
       return hora * 60 + minuto
     }
 
-    const inicioMin = timeToMinutes(horarioInicio)
-    const fimMin = timeToMinutes(horarioFim)
-
-    if (fimMin <= inicioMin) {
+    if (timeToMinutes(horarioFim) <= timeToMinutes(horarioInicio)) {
       toast.error('O horário de fim deve ser maior que o horário de início.')
       return
     }
@@ -913,13 +915,11 @@ function SlotsTab() {
       })
 
       toast.success('Exceção adicionada!')
-
       setData('')
       setHorarioInicio('')
       setHorarioFim('')
       setRecorrente(false)
       setDiasSemana([])
-
       fetchExcecoes()
     } catch (error) {
       console.error(error)
@@ -931,15 +931,12 @@ function SlotsTab() {
 
   async function handleDelete(ex) {
     try {
-      if (!ex?.data) {
-        toast.error('Exceção recorrente não pode ser removida por data.')
+      if (!ex?.id) {
+        toast.error('Não foi possível identificar a exceção.')
         return
       }
 
-      const dataFormatada = ex.data.slice(0, 10) // 🔥 aqui
-
-      await apiClient.delete(`/agenda/excecoes/${dataFormatada}`)
-
+      await apiClient.delete(`/agenda/excecoes/${ex.id}`)
       toast.success('Exceção removida!')
       fetchExcecoes()
     } catch (error) {
@@ -947,6 +944,7 @@ function SlotsTab() {
       toast.error('Erro ao remover exceção.')
     }
   }
+
   async function handleToggle(id) {
     try {
       await apiClient.patch(`/agenda/excecoes/${id}/toggle`)
@@ -959,166 +957,162 @@ function SlotsTab() {
   const diasMap = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
   return (
-  <div>
-    <p className="text-sm text-muted-foreground font-body mb-4">
-      Defina exceções de horário para dias específicos.
-    </p>
+    <div>
+      <p className="text-sm text-muted-foreground font-body mb-4">
+        Defina exceções de horário para dias específicos.
+      </p>
 
-    <form
-      onSubmit={handleAdd}
-      className="flex flex-wrap gap-3 items-end mb-6 p-4 bg-muted/40 rounded-xl border border-border"
-    >
-      {!recorrente && (
+      <form
+        onSubmit={handleAdd}
+        className="flex flex-wrap gap-3 items-end mb-6 p-4 bg-muted/40 rounded-xl border border-border"
+      >
+        {!recorrente && (
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Data</label>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              min={new Date().toISOString().slice(0, 10)}
+              className="border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        )}
+
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Data</label>
+          <label className="block text-xs text-muted-foreground mb-1">Início</label>
           <input
-            type="date"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-            min={new Date().toISOString().slice(0, 10)}
+            type="time"
+            value={horarioInicio}
+            onChange={(e) => setHorarioInicio(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm"
           />
         </div>
-      )}
 
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Início</label>
-        <input
-          type="time"
-          value={horarioInicio}
-          onChange={(e) => setHorarioInicio(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Fim</label>
-        <input
-          type="time"
-          value={horarioFim}
-          onChange={(e) => setHorarioFim(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-xs font-body text-muted-foreground">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Fim</label>
           <input
-            type="checkbox"
-            checked={recorrente}
-            onChange={(e) => setRecorrente(e.target.checked)}
-            className="h-4 w-4 rounded border border-input bg-background focus:ring-2 focus:ring-ring"
+            type="time"
+            value={horarioFim}
+            onChange={(e) => setHorarioFim(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm"
           />
-          Repetir por dias da semana
-        </label>
+        </div>
 
-        {recorrente && (
-          <div className="flex gap-2 flex-wrap mt-1">
-            {diasMap.map((label, i) => {
-              const ativo = diasSemana.includes(i);
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs font-body text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={recorrente}
+              onChange={(e) => setRecorrente(e.target.checked)}
+              className="h-4 w-4 rounded border border-input bg-background focus:ring-2 focus:ring-ring"
+            />
+            Repetir por dias da semana
+          </label>
 
-              return (
-                <button
-                  type="button"
-                  key={i}
-                  onClick={() => {
-                    if (ativo) {
-                      setDiasSemana(diasSemana.filter((d) => d !== i));
-                    } else {
-                      setDiasSemana([...diasSemana, i]);
-                    }
-                  }}
-                  className={`
-                    px-3 py-1.5 text-xs font-body rounded-lg border transition
-                    ${ativo
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-input hover:bg-muted'}
-                  `}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="bg-primary text-white px-4 py-2 rounded-lg text-sm"
-      >
-        {saving ? 'Salvando...' : 'Adicionar'}
-      </button>
-    </form>
-
-    {loading ? (
-      <p className="text-center py-8">Carregando...</p>
-    ) : excecoes.length === 0 ? (
-      <p className="text-center py-8 text-muted-foreground">
-        Nenhuma exceção cadastrada.
-      </p>
-    ) : (
-      <div className="flex flex-col gap-2">
-        {excecoes.map((ex, i) => {
-          const dataFormatada = ex?.data
-            ? new Date(ex.data).toLocaleDateString('pt-BR')
-            : '';
-
-          const inicio = ex?.horaInicioExcecao?.slice(0, 5);
-          const fim = ex?.horaFimExcecao?.slice(0, 5);
-
-          const diasFormatados = ex?.diasSemana?.length
-            ? ex.diasSemana.split(',').map(d => diasMap[Number(d)]).join(', ')
-            : '-';
-
-          const ativo = ex.ativo ?? true;
-
-          return (
-            <div key={i} className="flex items-center justify-between border rounded-xl px-4 py-3">
-              <div>
-                <span className="font-medium text-sm">
-                  {ex.recorrente ? diasFormatados : dataFormatada}
-                </span>
-
-                {(inicio || fim) && (
-                  <span className="text-xs text-muted-foreground ml-3">
-                    {inicio} → {fim}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex gap-3 items-center">
-                {/* Toggle apenas para recorrente */}
-                {ex.recorrente && (
+          {recorrente && (
+            <div className="flex gap-2 flex-wrap mt-1">
+              {diasMap.map((label, i) => {
+                const ativo = diasSemana.includes(i)
+                return (
                   <button
-                    onClick={() => handleToggle(ex.id)}
-                    className={`text-xs px-2 py-1 rounded border ${ativo
-                      ? 'bg-green-100 text-green-700 border-green-300'
-                      : 'bg-gray-100 text-gray-500 border-gray-300'
-                    }`}
+                    type="button"
+                    key={i}
+                    onClick={() =>
+                      setDiasSemana(ativo
+                        ? diasSemana.filter((d) => d !== i)
+                        : [...diasSemana, i]
+                      )
+                    }
+                    className={`
+                      px-3 py-1.5 text-xs font-body rounded-lg border transition
+                      ${ativo
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-input hover:bg-muted'}
+                    `}
                   >
-                    {ativo ? 'Ativo' : 'Inativo'}
+                    {label}
                   </button>
-                )}
+                )
+              })}
+            </div>
+          )}
+        </div>
 
-                {/* Delete apenas para data fixa */}
-                {!ex.recorrente && (
+        <button
+          type="submit"
+          disabled={saving}
+          className="bg-primary text-white px-4 py-2 rounded-lg text-sm"
+        >
+          {saving ? 'Salvando...' : 'Adicionar'}
+        </button>
+      </form>
+
+      {loading ? (
+        <p className="text-center py-8">Carregando...</p>
+      ) : excecoes.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">
+          Nenhuma exceção cadastrada.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {excecoes.map((ex) => {
+            const isRecorrente = Number(ex.recorrente) === 1
+
+            const dataFormatada = ex?.data
+              ? ex.data.slice(0, 10).split('-').reverse().join('/')
+              : ''
+
+            const inicio = ex?.horaInicioExcecao?.slice(0, 5)
+            const fim = ex?.horaFimExcecao?.slice(0, 5)
+
+            const diasFormatados = ex?.diasSemana
+              ? String(ex.diasSemana).split(',').map(d => diasMap[Number(d)]).join(', ')
+              : '-'
+
+            const ativo = ex.ativo !== 0 && ex.ativo !== '0' && ex.ativo !== false
+
+            return (
+              <div key={ex.id} className="flex items-center justify-between border rounded-xl px-4 py-3">
+                <div>
+                  <span className="font-medium text-sm">
+                    {isRecorrente ? diasFormatados : dataFormatada}
+                  </span>
+
+                  {(inicio || fim) && (
+                    <span className="text-xs text-muted-foreground ml-3">
+                      {inicio} → {fim}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-3 items-center">
+                  {isRecorrente && (
+                    <button
+                      onClick={() => handleToggle(ex.id)}
+                      className={`text-xs px-2 py-1 rounded border ${ativo
+                        ? 'bg-green-100 text-green-700 border-green-300'
+                        : 'bg-gray-100 text-gray-500 border-gray-300'
+                      }`}
+                    >
+                      {ativo ? 'Ativo' : 'Inativo'}
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleDelete(ex)}
                     className="text-xs text-red-500 hover:underline"
                   >
                     Remover
                   </button>
-                )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-  </div>
-);
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Produtos  ───────────────────────────────────────────────────────────────
