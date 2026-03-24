@@ -346,7 +346,7 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
               <label className="block text-sm font-medium font-body mb-1.5">Serviço</label>
               <select
                 value={servicoId}
-                onChange={(e) => setServicoId(e.target.value)}
+               onChange={(e) => setServicoId(Number(e.target.value))}
                 required
                 className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
               >
@@ -487,47 +487,57 @@ export default function AgendaPage() {
   const [agendarSlot, setAgendarSlot] = useState(null)
 
   async function fetchSlots(date) {
-    setLoading(true)
+  setLoading(true)
 
-    try {
-      const [slotsData, bloqueiosData] = await Promise.all([
-        apiClient.get(`/agenda/slots?date=${date}`),
-        apiClient.get('/agenda/bloqueios'),
-      ])
+  try {
+    const [slotsData, bloqueiosData, excecoesData] = await Promise.all([
+      apiClient.get(`/agenda/slots?date=${date}`),
+      apiClient.get('/agenda/bloqueios'),
+      apiClient.get('/agenda/excecoes'),
+    ])
 
-      const slotsArray = Array.isArray(slotsData) ? slotsData : slotsData?.slots || []
-      const bloqueiosArray = Array.isArray(bloqueiosData) ? bloqueiosData : bloqueiosData?.bloqueios || []
+    const slotsArray = Array.isArray(slotsData) ? slotsData : slotsData?.slots || []
+    const bloqueiosArray = Array.isArray(bloqueiosData) ? bloqueiosData : bloqueiosData?.bloqueios || []
+    const excecoesArray = Array.isArray(excecoesData) ? excecoesData : excecoesData?.excecoes || []
 
-      const bloqueiosDoDia = bloqueiosArray.filter((b) => {
-        return normalizeDateOnly(b?.data) === date
+    const diaSemana = new Date(date).getDay()
+
+    const slotsFormatados = slotsArray.map((slot) => {
+      const horaSlot = getHoraSlot(slot)
+
+      const bloqueado = bloqueiosArray.some((b) => {
+        return normalizeDateOnly(b?.data) === date && normalizeTime(b?.slot) === horaSlot
       })
 
-      const slotsFormatados = slotsArray.map((slot) => {
-        const horaSlot = getHoraSlot(slot)
+      const ocupada = isOcupado(slot)
 
-        const bloqueado = bloqueiosDoDia.some((b) => {
-          const horaBloqueio = normalizeTime(b?.slot)
-          return horaBloqueio === horaSlot
-        })
+      // ✅ verifica se está dentro de alguma exceção do dia ou recorrente
+      const dentroDaExcecao = excecoesArray.some((ex) => {
+        const exData = normalizeDateOnly(ex.data)
+        const diasRecorrentes = ex?.diasSemana?.split(',').map(Number) || []
+        const inicioEx = normalizeTime(ex?.horaInicioExcecao)
+        const fimEx = normalizeTime(ex?.horaFimExcecao)
 
-        const ocupadoOriginal = isOcupado(slot)
-
-        return {
-          ...slot,
-          bloqueado,
-          ocupado: ocupadoOriginal,
-          status: bloqueado ? 'bloqueado' : ocupadoOriginal ? 'ocupado' : 'disponivel',
-        }
+        const aplicaData = exData ? exData === date : diasRecorrentes.includes(diaSemana)
+        return aplicaData && inicioEx && fimEx && horaSlot >= inicioEx && horaSlot < fimEx
       })
 
-      setSlots(slotsFormatados)
-    } catch (error) {
-      console.error('Erro ao buscar slots:', error)
-      setSlots([])
-    } finally {
-      setLoading(false)
-    }
+      return {
+        ...slot,
+        bloqueado: bloqueado || dentroDaExcecao,
+        ocupado: ocupada,
+        status: bloqueado || dentroDaExcecao ? 'bloqueado' : ocupada ? 'ocupado' : 'disponivel',
+      }
+    })
+
+    setSlots(slotsFormatados)
+  } catch (error) {
+    console.error('Erro ao buscar slots:', error)
+    setSlots([])
+  } finally {
+    setLoading(false)
   }
+}
 
   async function fetchConfig() {
     try {
@@ -612,47 +622,69 @@ export default function AgendaPage() {
   }
 
   async function handleAgendar({ slot, data, servicoId, tipo, subTipo, codigoConvite }) {
-    try {
-      if (tipo === 'turma') {
-        if (subTipo === 'nova') {
-          const horaInicio = getHoraSlot(slot)
+  console.log({ slot, data, servicoId, tipo, subTipo, codigoConvite });
 
-          // Calcula hora fim = hora início + 2 horas automaticamente
-          const [h, m, s] = horaInicio.split(':').map(Number)
-          const base = new Date(1970, 0, 1, h, m, s || 0)
-          base.setHours(base.getHours() + 2)
-          const horaFim = base.toTimeString().slice(0, 8)
+  try {
+   
+    const servicoIdNum = Number(servicoId);
 
-          const resp = await apiClient.post('/turmas', {
-            servicoId: Number(servicoId),
-            data,
-            horaInicio,
-            horaFim,
-          })
+    if (!servicoId || isNaN(servicoIdNum) || servicoIdNum <= 0) {
+      toast.error('Selecione um serviço válido.');
+      return;
+    }
 
-          toast.success(`Turma criada! Código: ${resp.codigoConvite} — aguardando aprovação.`)
+    if (tipo === 'turma') {
+      if (subTipo === 'nova') {
+        const horaInicio = getHoraSlot(slot);
 
-        } else if (subTipo === 'codigo') {
-        await apiClient.post(`/turmas/convites/${codigoConvite.trim().toUpperCase()}/aceitar`)
-          toast.success('Você entrou na turma com sucesso!')
+        const [h, m, s] = horaInicio.split(':').map(Number);
+        const base = new Date(1970, 0, 1, h, m, s || 0);
+        base.setHours(base.getHours() + 2);
+        const horaFim = base.toTimeString().slice(0, 8);
+
+        const resp = await apiClient.post('/turmas', {
+          servicoId: servicoIdNum,
+          data,
+          horaInicio,
+          horaFim,
+        });
+
+        toast.success(`Turma criada! Código: ${resp.codigoConvite} — aguardando aprovação.`);
+
+      } else if (subTipo === 'codigo') {
+
+        if (!codigoConvite?.trim()) {
+          toast.error('Informe o código da turma.');
+          return;
         }
 
-      } else {
-        await apiClient.post('/agendamentos', {
-          data,
-          horaInicio: getHoraSlot(slot),
-          servicoId: Number(servicoId),
-        })
-        toast.success('Agendamento realizado!')
+        await apiClient.post(`/turmas/convites/${codigoConvite.trim().toUpperCase()}/aceitar`);
+        toast.success('Você entrou na turma com sucesso!');
       }
 
-      fetchSlots(selectedDate)
-    } catch (error) {
-      const msg = error?.response?.data?.msg || error?.message || 'Erro ao realizar agendamento.'
-      toast.error(msg)
-    }
-  }
+    } else {
+      await apiClient.post('/agendamentos', {
+        data,
+        horaInicio: getHoraSlot(slot),
+        servicoId: servicoIdNum,
+      });
 
+      toast.success('Agendamento realizado!');
+    }
+
+    fetchSlots(selectedDate);
+
+  } catch (error) {
+    console.error(error);
+
+    const msg =
+      error?.response?.data?.msg ||
+      error?.message ||
+      'Erro ao realizar agendamento.';
+
+    toast.error(msg);
+  }
+}
   function slotColor(slot) {
     if (isBloqueado(slot)) {
       return 'bg-muted text-muted-foreground border-border'

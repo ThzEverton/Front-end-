@@ -823,9 +823,7 @@ function ServicoModal({ servico, onClose, onSalvo }) {
     </div>
   )
 }
-
-// ─── Slots / Exceções ────────────────────────────────────────────────────────
-
+//exe diasssss
 function SlotsTab() {
   const [excecoes, setExcecoes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -833,6 +831,9 @@ function SlotsTab() {
   const [horarioInicio, setHorarioInicio] = useState('')
   const [horarioFim, setHorarioFim] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const [recorrente, setRecorrente] = useState(false)
+  const [diasSemana, setDiasSemana] = useState([])
 
   async function fetchExcecoes() {
     setLoading(true)
@@ -855,8 +856,13 @@ function SlotsTab() {
   async function handleAdd(e) {
     e.preventDefault()
 
-    if (!data) {
+    if (!recorrente && !data) {
       toast.error('Informe a data.')
+      return
+    }
+
+    if (recorrente && diasSemana.length === 0) {
+      toast.error('Selecione ao menos um dia da semana.')
       return
     }
 
@@ -865,7 +871,7 @@ function SlotsTab() {
       .toISOString()
       .slice(0, 10)
 
-    if (data < hojeString) {
+    if (!recorrente && data < hojeString) {
       toast.error('Não é permitido cadastrar exceção para data passada.')
       return
     }
@@ -899,15 +905,21 @@ function SlotsTab() {
     setSaving(true)
     try {
       await apiClient.post('/agenda/excecoes', {
-        data,
+        data: recorrente ? null : data,
         horaInicioExcecao: horarioInicio + ':00',
         horaFimExcecao: horarioFim + ':00',
+        recorrente,
+        diasSemana: recorrente ? diasSemana : null
       })
 
       toast.success('Exceção adicionada!')
+
       setData('')
       setHorarioInicio('')
       setHorarioFim('')
+      setRecorrente(false)
+      setDiasSemana([])
+
       fetchExcecoes()
     } catch (error) {
       console.error(error)
@@ -917,9 +929,17 @@ function SlotsTab() {
     }
   }
 
-  async function handleDelete(dataExcecao) {
+  async function handleDelete(ex) {
     try {
-      await apiClient.delete(`/agenda/excecoes/${dataExcecao}`)
+      if (!ex?.data) {
+        toast.error('Exceção recorrente não pode ser removida por data.')
+        return
+      }
+
+      const dataFormatada = ex.data.slice(0, 10) // 🔥 aqui
+
+      await apiClient.delete(`/agenda/excecoes/${dataFormatada}`)
+
       toast.success('Exceção removida!')
       fetchExcecoes()
     } catch (error) {
@@ -927,102 +947,178 @@ function SlotsTab() {
       toast.error('Erro ao remover exceção.')
     }
   }
+  async function handleToggle(id) {
+    try {
+      await apiClient.patch(`/agenda/excecoes/${id}/toggle`)
+      fetchExcecoes()
+    } catch (e) {
+      toast.error('Erro ao alterar status')
+    }
+  }
+
+  const diasMap = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
   return (
-    <div>
-      <p className="text-sm text-muted-foreground font-body mb-4">
-        Defina exceções de horário para dias específicos.
-      </p>
+  <div>
+    <p className="text-sm text-muted-foreground font-body mb-4">
+      Defina exceções de horário para dias específicos.
+    </p>
 
-      <form
-        onSubmit={handleAdd}
-        className="flex flex-wrap gap-3 items-end mb-6 p-4 bg-muted/40 rounded-xl border border-border"
-      >
+    <form
+      onSubmit={handleAdd}
+      className="flex flex-wrap gap-3 items-end mb-6 p-4 bg-muted/40 rounded-xl border border-border"
+    >
+      {!recorrente && (
         <div>
-          <label className="block text-xs font-body text-muted-foreground mb-1">Data</label>
+          <label className="block text-xs text-muted-foreground mb-1">Data</label>
           <input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            required
             min={new Date().toISOString().slice(0, 10)}
-            className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+            className="border rounded-lg px-3 py-2 text-sm"
           />
-        </div>
-
-        <div>
-          <label className="block text-xs font-body text-muted-foreground mb-1">Início</label>
-          <input
-            type="time"
-            value={horarioInicio}
-            onChange={(e) => setHorarioInicio(e.target.value)}
-            className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-body text-muted-foreground mb-1">Fim</label>
-          <input
-            type="time"
-            value={horarioFim}
-            onChange={(e) => setHorarioFim(e.target.value)}
-            className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60"
-        >
-          {saving && <Loader2 size={14} className="animate-spin" />}
-          <Plus size={14} /> Adicionar
-        </button>
-      </form>
-
-      {loading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="animate-spin text-primary" size={24} />
-        </div>
-      ) : excecoes.length === 0 ? (
-        <p className="text-center py-8 text-muted-foreground font-body">
-          Nenhuma exceção cadastrada.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {excecoes.map((ex, i) => {
-            const dataFormatada = ex?.data ? new Date(ex.data).toLocaleDateString('pt-BR') : ''
-            const inicio = ex?.horaInicioExcecao?.slice(0, 5)
-            const fim = ex?.horaFimExcecao?.slice(0, 5)
-
-            return (
-              <div
-                key={ex?.data || i}
-                className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3"
-              >
-                <div>
-                  <span className="font-medium font-body text-sm">{dataFormatada}</span>
-
-                  {(inicio || fim) && (
-                    <span className="text-xs text-muted-foreground ml-3 font-body">
-                      {inicio} → {fim}
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => handleDelete(ex?.data)}
-                  className="text-xs text-destructive hover:underline font-body"
-                >
-                  Remover
-                </button>
-              </div>
-            )
-          })}
         </div>
       )}
-    </div>
-  )
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Início</label>
+        <input
+          type="time"
+          value={horarioInicio}
+          onChange={(e) => setHorarioInicio(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Fim</label>
+        <input
+          type="time"
+          value={horarioFim}
+          onChange={(e) => setHorarioFim(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2 text-xs font-body text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={recorrente}
+            onChange={(e) => setRecorrente(e.target.checked)}
+            className="h-4 w-4 rounded border border-input bg-background focus:ring-2 focus:ring-ring"
+          />
+          Repetir por dias da semana
+        </label>
+
+        {recorrente && (
+          <div className="flex gap-2 flex-wrap mt-1">
+            {diasMap.map((label, i) => {
+              const ativo = diasSemana.includes(i);
+
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  onClick={() => {
+                    if (ativo) {
+                      setDiasSemana(diasSemana.filter((d) => d !== i));
+                    } else {
+                      setDiasSemana([...diasSemana, i]);
+                    }
+                  }}
+                  className={`
+                    px-3 py-1.5 text-xs font-body rounded-lg border transition
+                    ${ativo
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background border-input hover:bg-muted'}
+                  `}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="bg-primary text-white px-4 py-2 rounded-lg text-sm"
+      >
+        {saving ? 'Salvando...' : 'Adicionar'}
+      </button>
+    </form>
+
+    {loading ? (
+      <p className="text-center py-8">Carregando...</p>
+    ) : excecoes.length === 0 ? (
+      <p className="text-center py-8 text-muted-foreground">
+        Nenhuma exceção cadastrada.
+      </p>
+    ) : (
+      <div className="flex flex-col gap-2">
+        {excecoes.map((ex, i) => {
+          const dataFormatada = ex?.data
+            ? new Date(ex.data).toLocaleDateString('pt-BR')
+            : '';
+
+          const inicio = ex?.horaInicioExcecao?.slice(0, 5);
+          const fim = ex?.horaFimExcecao?.slice(0, 5);
+
+          const diasFormatados = ex?.diasSemana?.length
+            ? ex.diasSemana.split(',').map(d => diasMap[Number(d)]).join(', ')
+            : '-';
+
+          const ativo = ex.ativo ?? true;
+
+          return (
+            <div key={i} className="flex items-center justify-between border rounded-xl px-4 py-3">
+              <div>
+                <span className="font-medium text-sm">
+                  {ex.recorrente ? diasFormatados : dataFormatada}
+                </span>
+
+                {(inicio || fim) && (
+                  <span className="text-xs text-muted-foreground ml-3">
+                    {inicio} → {fim}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex gap-3 items-center">
+                {/* Toggle apenas para recorrente */}
+                {ex.recorrente && (
+                  <button
+                    onClick={() => handleToggle(ex.id)}
+                    className={`text-xs px-2 py-1 rounded border ${ativo
+                      ? 'bg-green-100 text-green-700 border-green-300'
+                      : 'bg-gray-100 text-gray-500 border-gray-300'
+                    }`}
+                  >
+                    {ativo ? 'Ativo' : 'Inativo'}
+                  </button>
+                )}
+
+                {/* Delete apenas para data fixa */}
+                {!ex.recorrente && (
+                  <button
+                    onClick={() => handleDelete(ex)}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+);
 }
 
 // ─── Produtos  ───────────────────────────────────────────────────────────────
@@ -1074,8 +1170,8 @@ function ProdutosTabSimples() {
       console.error('RESPOSTA BACK:', error?.response?.data)
       toast.error(
         error?.response?.data?.msg ||
-          error?.response?.data?.message ||
-          'Erro ao salvar produto.'
+        error?.response?.data?.message ||
+        'Erro ao salvar produto.'
       )
     }
   }
@@ -1334,11 +1430,10 @@ export default function CadastrosPage() {
           <button
             key={a.key}
             onClick={() => setAba(a.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-body border-b-2 transition-colors whitespace-nowrap ${
-              aba === a.key
-                ? 'border-primary text-primary font-medium'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-body border-b-2 transition-colors whitespace-nowrap ${aba === a.key
+              ? 'border-primary text-primary font-medium'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
           >
             <a.icon size={15} />
             {a.label}
