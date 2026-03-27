@@ -53,12 +53,14 @@ function isBloqueado(slot) {
 }
 
 function isOcupado(slot) {
+  const status = String(slot?.status || '').toLowerCase().trim()
+
   return (
     slot?.ocupado === true ||
     slot?.ocupado === 1 ||
     slot?.ocupado === '1' ||
     slot?.ocupado === 'true' ||
-    slot?.status === 'ocupado'
+    ['ocupado', 'ativo', 'confirmado', 'agendado'].includes(status)
   )
 }
 
@@ -171,7 +173,7 @@ function ConfigModal({ config, onClose, onSave }) {
                 <input
                   type="time"
                   value={inicioSemana}
-                  onChange={(e) => setInicioSemana(e.target.value)}
+                onChange={(e) => setInicioSemana(e.target.value)}
                   className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
                 />
               </div>
@@ -266,9 +268,8 @@ function ConfigModal({ config, onClose, onSave }) {
 function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
   const [servicoId, setServicoId] = useState('')
   const [tipo, setTipo] = useState('individual')
-  const [passo, setPasso] = useState(1)   // 1 = escolha, 2 = turma
-  const [subTipo, setSubTipo] = useState('')  // 'nova' | 'codigo'
-  const [horaFim, setHoraFim] = useState('')
+  const [passo, setPasso] = useState(1)
+  const [subTipo, setSubTipo] = useState('')
   const [codigoConvite, setCodigo] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -296,7 +297,6 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
         data,
         servicoId,
         tipo,
-        horaFim: horaFim || null,
         subTipo,
         codigoConvite,
       })
@@ -319,7 +319,6 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
       return
     }
 
-    // Removida validação de horaFim — calculado automaticamente no handleAgendar
     await handleSubmit()
   }
 
@@ -339,14 +338,13 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
           {formatDate(data)} às {getHoraSlot(slot)}
         </p>
 
-        {/* ── PASSO 1: serviço + tipo ── */}
         {passo === 1 && (
           <form onSubmit={handleProximo} className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium font-body mb-1.5">Serviço</label>
               <select
                 value={servicoId}
-               onChange={(e) => setServicoId(Number(e.target.value))}
+                onChange={(e) => setServicoId(e.target.value)}
                 required
                 className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
               >
@@ -399,7 +397,6 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
           </form>
         )}
 
-        {/* ── PASSO 2: opções de turma ── */}
         {passo === 2 && (
           <form onSubmit={handleConfirmarTurma} className="flex flex-col gap-4">
             <div>
@@ -428,14 +425,12 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
               </div>
             </div>
 
-            {/* Campo extra: hora fim (nova turma) */}
             {subTipo === 'nova' && (
               <p className="text-xs text-muted-foreground font-body bg-muted px-3 py-2 rounded-lg">
                 A turma terá duração de 2 horas. Ficará pendente até a gerente aprovar.
               </p>
             )}
 
-            {/* Campo extra: código (entrar por código) */}
             {subTipo === 'codigo' && (
               <div>
                 <label className="block text-sm font-medium font-body mb-1.5">
@@ -475,14 +470,8 @@ function AgendarModal({ slot, data, servicos, onClose, onConfirm }) {
     </div>
   )
 }
-// ✅ Converte qualquer string de hora (HH:mm ou HH:mm:ss) para minutos inteiros
-// Evita bugs de comparação lexicográfica entre strings de formatos diferentes
-function toMinutes(timeStr) {
-  if (!timeStr || typeof timeStr !== 'string') return null
-  const parts = timeStr.split(':').map(Number)
-  if (parts.length < 2 || parts.some(isNaN)) return null
-  return parts[0] * 60 + parts[1]
-}
+
+
 
 export default function AgendaPage() {
   const { isGerente } = useUser()
@@ -494,80 +483,39 @@ export default function AgendaPage() {
   const [showConfig, setShowConfig] = useState(false)
   const [agendarSlot, setAgendarSlot] = useState(null)
 
-  async function fetchSlots(date) {
-    setLoading(true)
+    async function fetchSlots(date) {
+      setLoading(true)
 
-    try {
-      const [slotsData, bloqueiosData, excecoesData] = await Promise.all([
-        apiClient.get(`/agenda/slots?date=${date}`),
-        apiClient.get('/agenda/bloqueios'),
-        apiClient.get('/agenda/excecoes'),
-      ])
+      try {
+        const slotsData = await apiClient.get(`/agenda/slots?date=${date}`)
+        const slotsArray = Array.isArray(slotsData) ? slotsData : slotsData?.slots || []
 
-      const slotsArray = Array.isArray(slotsData) ? slotsData : slotsData?.slots || []
-      const bloqueiosArray = Array.isArray(bloqueiosData) ? bloqueiosData : bloqueiosData?.bloqueios || []
-      const excecoesArray = Array.isArray(excecoesData) ? excecoesData : excecoesData?.excecoes || []
+        const slotsFormatados = slotsArray.map((slot) => {
+          const hora = getHoraSlot(slot)
+          const bloqueado = isBloqueado(slot)
+          const ocupado = isOcupado(slot)
 
-      // ✅ new Date('2026-03-24') interpreta como UTC e getDay() retorna o dia errado no fuso de Brasília.
-      // Parse manual força interpretação local, evitando "segunda virar domingo", etc.
-      const [ano, mes, dia] = date.split('-').map(Number)
-      const diaSemana = new Date(ano, mes - 1, dia).getDay()
+          let status = 'disponivel'
+          if (bloqueado) status = 'bloqueado'
+          else if (ocupado) status = 'ocupado'
 
-      const slotsFormatados = slotsArray.map((slot) => {
-        const horaSlot = getHoraSlot(slot)
-        const horaSlotMin = toMinutes(horaSlot)
-
-        const bloqueado = bloqueiosArray.some((b) => {
-          return normalizeDateOnly(b?.data) === date && normalizeTime(b?.slot) === horaSlot
+          return {
+            ...slot,
+            slot: hora,
+            bloqueado,
+            ocupado,
+            status,
+          }
         })
 
-        const ocupada = isOcupado(slot)
-
-        // ✅ Comparação numérica (minutos) — elimina bug de "10:00:00" >= "10:18" ser true por string
-        const dentroDaExcecao = excecoesArray.some((ex) => {
-          const exData = normalizeDateOnly(ex.data)
-
-          // ✅ diasSemana pode vir null/undefined sem crash
-          const diasRecorrentes = ex?.diasSemana
-            ? ex.diasSemana.split(',').map(Number).filter((n) => !isNaN(n))
-            : []
-
-          const inicioEx = toMinutes(ex?.horaInicioExcecao)
-          const fimEx = toMinutes(ex?.horaFimExcecao)
-
-          // ✅ Ignora exceções com horário ausente ou inválido
-          if (inicioEx === null || fimEx === null || horaSlotMin === null) return false
-
-          // ✅ Data específica tem prioridade; senão aplica por dia da semana recorrente
-          const aplicaData = exData ? exData === date : diasRecorrentes.includes(diaSemana)
-
-          return aplicaData && horaSlotMin >= inicioEx && horaSlotMin < fimEx
-        })
-
-        return {
-          ...slot,
-          bloqueado,                           // apenas bloqueio manual do gerente
-          _ocultarPorExcecao: dentroDaExcecao, // slots de exceção somem da tela
-          ocupado: ocupada,
-          status: bloqueado
-            ? 'bloqueado'
-            : dentroDaExcecao
-            ? 'excecao'
-            : ocupada
-            ? 'ocupado'
-            : 'disponivel',
-        }
-      })
-
-      // ✅ Slots dentro de exceções são removidos — bloqueios manuais continuam aparecendo
-      setSlots(slotsFormatados.filter((slot) => !slot._ocultarPorExcecao))
-    } catch (error) {
-      console.error('Erro ao buscar slots:', error)
-      setSlots([])
-    } finally {
-      setLoading(false)
+        setSlots(slotsFormatados)
+      } catch (error) {
+        console.error('Erro ao buscar slots:', error)
+        setSlots([])
+      } finally {
+        setLoading(false)
+      }
     }
-  }
 
   async function fetchConfig() {
     try {
@@ -652,8 +600,6 @@ export default function AgendaPage() {
   }
 
   async function handleAgendar({ slot, data, servicoId, tipo, subTipo, codigoConvite }) {
-    console.log({ slot, data, servicoId, tipo, subTipo, codigoConvite })
-
     try {
       const servicoIdNum = Number(servicoId)
 
@@ -666,16 +612,10 @@ export default function AgendaPage() {
         if (subTipo === 'nova') {
           const horaInicio = getHoraSlot(slot)
 
-          const [h, m, s] = horaInicio.split(':').map(Number)
-          const base = new Date(1970, 0, 1, h, m, s || 0)
-          base.setHours(base.getHours() + 2)
-          const horaFim = base.toTimeString().slice(0, 8)
-
           const resp = await apiClient.post('/turmas', {
             servicoId: servicoIdNum,
             data,
             horaInicio,
-            horaFim,
           })
 
           toast.success(`Turma criada! Código: ${resp.codigoConvite} — aguardando aprovação.`)
@@ -797,9 +737,9 @@ export default function AgendaPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {slots.map((slot, i) => {
-            const bloqueado = isBloqueado(slot)
-            const ocupado = isOcupado(slot)
-            const disponivel = !bloqueado && !ocupado
+            const bloqueado = slot?.status === 'bloqueado'
+            const ocupado = slot?.status === 'ocupado'
+            const disponivel = slot?.status === 'disponivel'
             const hora = getHoraSlot(slot)
 
             return (
