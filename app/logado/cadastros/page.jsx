@@ -956,7 +956,7 @@ function SlotsTab() {
 
   const diasMap = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-  return (
+ return (
     <div>
       <p className="text-sm text-muted-foreground font-body mb-4">
         Defina exceções de horário para dias específicos.
@@ -968,46 +968,61 @@ function SlotsTab() {
       >
         {!recorrente && (
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">Data</label>
+            <label className="block text-xs text-muted-foreground font-body mb-1">Data</label>
             <input
               type="date"
               value={data}
               onChange={(e) => setData(e.target.value)}
               min={new Date().toISOString().slice(0, 10)}
-              className="border rounded-lg px-3 py-2 text-sm"
+              className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
             />
           </div>
         )}
 
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Início</label>
+          <label className="block text-xs text-muted-foreground font-body mb-1">Início</label>
           <input
             type="time"
             value={horarioInicio}
             onChange={(e) => setHorarioInicio(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm"
+            className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
           />
         </div>
 
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Fim</label>
+          <label className="block text-xs text-muted-foreground font-body mb-1">Fim</label>
           <input
             type="time"
             value={horarioFim}
             onChange={(e) => setHorarioFim(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm"
+            className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
           />
         </div>
 
+        
         <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-xs font-body text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={recorrente}
-              onChange={(e) => setRecorrente(e.target.checked)}
-              className="h-4 w-4 rounded border border-input bg-background focus:ring-2 focus:ring-ring"
-            />
-            Repetir por dias da semana
+          <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+            <div className={`
+              w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
+              ${recorrente
+                ? 'bg-primary border-primary'
+                : 'bg-background border-input group-hover:border-primary/60'}
+            `}>
+              {recorrente && (
+                <svg className="w-2.5 h-2.5 text-primary-foreground" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              <input
+                type="checkbox"
+                checked={recorrente}
+                onChange={(e) => setRecorrente(e.target.checked)}
+                className="sr-only"
+              />
+            </div>
+            <span className="text-xs font-body text-muted-foreground group-hover:text-foreground transition-colors">
+              Repetir por dias da semana
+            </span>
           </label>
 
           {recorrente && (
@@ -1025,7 +1040,7 @@ function SlotsTab() {
                       )
                     }
                     className={`
-                      px-3 py-1.5 text-xs font-body rounded-lg border transition
+                      px-3 py-1.5 text-xs font-body rounded-lg border transition-colors
                       ${ativo
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-background border-input hover:bg-muted'}
@@ -1042,16 +1057,16 @@ function SlotsTab() {
         <button
           type="submit"
           disabled={saving}
-          className="bg-primary text-white px-4 py-2 rounded-lg text-sm"
+          className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-body hover:opacity-90 disabled:opacity-60 transition-opacity"
         >
           {saving ? 'Salvando...' : 'Adicionar'}
         </button>
       </form>
 
       {loading ? (
-        <p className="text-center py-8">Carregando...</p>
+        <p className="text-center py-8 text-sm text-muted-foreground font-body">Carregando...</p>
       ) : excecoes.length === 0 ? (
-        <p className="text-center py-8 text-muted-foreground">
+        <p className="text-center py-8 text-muted-foreground font-body text-sm">
           Nenhuma exceção cadastrada.
         </p>
       ) : (
@@ -1073,35 +1088,41 @@ function SlotsTab() {
             const ativo = ex.ativo !== 0 && ex.ativo !== '0' && ex.ativo !== false
 
             return (
-              <div key={ex.id} className="flex items-center justify-between border rounded-xl px-4 py-3">
-                <div>
-                  <span className="font-medium text-sm">
+              <div key={ex.id} className="flex items-center justify-between border border-border rounded-xl px-4 py-3 bg-card hover:bg-muted/20 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-sm font-body">
                     {isRecorrente ? diasFormatados : dataFormatada}
                   </span>
-
                   {(inicio || fim) && (
-                    <span className="text-xs text-muted-foreground ml-3">
+                    <span className="text-xs text-muted-foreground font-body bg-muted px-2 py-0.5 rounded-full">
                       {inicio} → {fim}
                     </span>
                   )}
                 </div>
 
-                <div className="flex gap-3 items-center">
+                <div className="flex gap-2 items-center">
                   {isRecorrente && (
                     <button
+                      type="button"
                       onClick={() => handleToggle(ex.id)}
-                      className={`text-xs px-2 py-1 rounded border ${ativo
-                        ? 'bg-green-100 text-green-700 border-green-300'
-                        : 'bg-gray-100 text-gray-500 border-gray-300'
-                      }`}
+                      className="flex items-center gap-1 text-xs font-body"
                     >
-                      {ativo ? 'Ativo' : 'Inativo'}
+                      {ativo ? (
+                        <>
+                          <ToggleRight size={18} className="text-green-600" /> Ativo
+                        </>
+                      ) : (
+                        <>
+                          <ToggleLeft size={18} className="text-muted-foreground" /> Inativo
+                        </>
+                      )}
                     </button>
                   )}
 
                   <button
+                    type="button"
                     onClick={() => handleDelete(ex)}
-                    className="text-xs text-red-500 hover:underline"
+                    className="text-xs font-body text-destructive hover:bg-destructive/10 px-3 py-1 rounded-full border border-transparent hover:border-destructive/20 transition-colors"
                   >
                     Remover
                   </button>
