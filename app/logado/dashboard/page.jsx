@@ -26,7 +26,7 @@ function erroApi(error, fallback) {
   )
 }
 
-// ✅ Converte "2026-03-27T03:00:00.000Z" → "27/03/2026" sem problema de timezone
+// Converte "2026-03-27T03:00:00.000Z" → "27/03/2026" sem problema de timezone
 function formatarDataISO(dataISO) {
   if (!dataISO) return '-'
   try {
@@ -38,7 +38,7 @@ function formatarDataISO(dataISO) {
   }
 }
 
-// ✅ Retorna HH:MM direto do campo horaInicio
+// Retorna HH:MM direto do campo horaInicio
 function formatarHora(valor) {
   if (!valor) return '-'
   return String(valor).slice(0, 5)
@@ -67,11 +67,11 @@ function DashboardGerente({ loadingAll, agendamentosHoje, vendas, produtos, fina
   const vendasHoje = vendas.filter((v) => v?.createdAt?.startsWith(hoje) || v?.data?.startsWith(hoje))
   const totalVendasHoje = vendasHoje.reduce((acc, v) => acc + Number(v?.total || v?.valor_total || 0), 0)
 
-  const mesAtual = hoje.slice(0, 7)
+  const mesAtual = hoje.slice(0, 7) // "2026-04"
   const receitaMes = financeiro
     .filter((f) => {
       const status = String(f?.status || '').toLowerCase()
-      return status === 'pago' && String(f?.data || f?.dataRef || f?.data_ref || '').startsWith(mesAtual)
+      return status === 'pago' && String(f?.dataRef || '').startsWith(mesAtual)
     })
     .reduce((acc, f) => acc + Number(f?.valor || 0), 0)
 
@@ -110,11 +110,9 @@ function DashboardGerente({ loadingAll, agendamentosHoje, vendas, produtos, fina
               {agProximos.map((a, i) => (
                 <div key={a?.id || i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div>
-                    {/* ✅ FIX: nome vem de criadoPor.nome */}
                     <p className="text-sm font-medium text-card-foreground font-body">
                       {a?.criadoPor?.nome || '-'}
                     </p>
-                    {/* ✅ FIX: horário vem de horaInicio */}
                     <p className="text-xs text-muted-foreground font-body">
                       {a?.servico?.nome || '-'} · {formatarHora(a?.horaInicio)}
                     </p>
@@ -244,7 +242,6 @@ function DashboardCliente({ loadingAll, agendamentosHoje, slots }) {
                     <p className="text-sm font-medium text-card-foreground font-body">
                       {a?.servico?.nome || '-'}
                     </p>
-                    {/* ✅ FIX: data sem Invalid Date + hora de horaInicio */}
                     <p className="text-xs text-muted-foreground font-body">
                       {formatarDataISO(a?.data)} · {formatarHora(a?.horaInicio)}
                     </p>
@@ -333,7 +330,8 @@ export default function DashboardPage() {
 
         if (finRes.status === 'fulfilled') {
           const d = finRes.value
-          setFinanceiro(Array.isArray(d) ? d : d?.data || d?.financeiro || [])
+          // ✅ FIX: /financeiro retorna { registros: [], resumo: {} }
+          setFinanceiro(Array.isArray(d) ? d : d?.registros || d?.data || [])
         } else {
           toast.error(erroApi(finRes.reason, 'Erro ao carregar financeiro.'))
         }
