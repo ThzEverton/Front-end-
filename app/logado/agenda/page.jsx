@@ -640,7 +640,7 @@ export default function AgendaPage() {
 
       fetchSlots(selectedDate)
     } catch (error) {
-      console.error(error)
+      console.error(msg)
 
       const msg =
         error?.response?.data?.msg ||

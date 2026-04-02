@@ -36,7 +36,14 @@ export default function FinanceiroPage() {
       setLoading(false)
     }
   }
-
+function erroApi(error, fallback) {
+  return (
+    error?.response?.data?.msg ||
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    fallback
+  )
+}
   useEffect(() => {
     fetchFinanceiro()
     // eslint-disable-next-line react-hooks/exhaustive-deps

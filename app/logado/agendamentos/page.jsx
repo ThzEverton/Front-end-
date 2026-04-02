@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useUser } from '@/context/userContext'
 import apiClient from '@/utils/apiClient'
+import DisparoEmMassa from '@/components/DisparoEmMassa'
 import {
   formatDate,
   statusAgendamentoLabel,
@@ -303,6 +304,8 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
     window.open(`https://wa.me/${tel}?text=${msg}`, '_blank')
   }
 
+
+<DisparoEmMassa />
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
       <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl animate-fade-in">
