@@ -81,25 +81,136 @@ function StatusBadge({ status }) {
   )
 }
 
-// ─── Modal: Editar turma ─────────────────────────────────────────────────────
 function EditarTurmaModal({ turma, onClose, onAtualizar }) {
   const [form, setForm] = useState({
     data: turma?.data ? String(turma.data).slice(0, 10) : '',
     horaInicio: turma?.horaInicio ? String(turma.horaInicio).slice(0, 5) : '',
     horaFim: turma?.horaFim ? String(turma.horaFim).slice(0, 5) : '',
-    capacidadeMaxima: turma?.capacidadeMaxima ?? 5,
+    capacidadeMaxima: turma?.capacidadeMaxima ?? turma?.capacidade_maxima ?? 5,
   })
+
+  const [horariosDisponiveis, setHorariosDisponiveis] = useState([])
+  const [loadingHorarios, setLoadingHorarios] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  function extrairPayload(response) {
+    return response?.data ?? response
+  }
+
+  function formatarHorarioSeguro(valor) {
+    if (!valor) return '-'
+
+    if (typeof valor === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(valor)) {
+      return valor.slice(0, 5)
+    }
+
+    try {
+      const data = new Date(valor)
+      if (Number.isNaN(data.getTime())) return '-'
+
+      return data.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+    } catch {
+      return '-'
+    }
+  }
+
+  function somarHoras(hora, quantidadeHoras) {
+    if (!hora) return ''
+
+    const [h, m] = String(hora).split(':').map(Number)
+
+    const data = new Date()
+    data.setHours(h || 0, m || 0, 0, 0)
+    data.setHours(data.getHours() + quantidadeHoras)
+
+    const hh = String(data.getHours()).padStart(2, '0')
+    const mm = String(data.getMinutes()).padStart(2, '0')
+
+    return `${hh}:${mm}`
+  }
+
+  async function fetchHorariosDisponiveis(data) {
+    if (!data) {
+      setHorariosDisponiveis([])
+      return
+    }
+
+    setLoadingHorarios(true)
+
+    try {
+      const response = await apiClient.get(`/agenda/slots?date=${data}`)
+      const payload = extrairPayload(response)
+
+      const lista = Array.isArray(payload)
+        ? payload
+        : payload?.slots || payload?.horarios || payload?.data || []
+
+      const horaAtualDaTurma = formatarHorarioSeguro(turma?.horaInicio)
+
+      const livres = lista
+        .filter((item) => {
+          if (typeof item === 'string') return true
+          return item?.bloqueado !== true && item?.ocupado !== true
+        })
+        .map((item) => {
+          if (typeof item === 'string') return formatarHorarioSeguro(item)
+          return formatarHorarioSeguro(item?.slot || item?.horario)
+        })
+        .filter((hora) => hora && hora !== '-')
+
+      const listaFinal = [...new Set(
+        form.data === (turma?.data ? String(turma.data).slice(0, 10) : '')
+          ? [...livres, horaAtualDaTurma].filter(Boolean)
+          : livres
+      )].sort()
+
+      setHorariosDisponiveis(listaFinal)
+    } catch (error) {
+      console.error(error)
+      setHorariosDisponiveis([])
+      toast.error(error?.response?.data?.msg || 'Erro ao carregar horários disponíveis.')
+    } finally {
+      setLoadingHorarios(false)
+    }
+  }
+
+  useEffect(() => {
+    if (form.data) {
+      fetchHorariosDisponiveis(form.data)
+    }
+  }, [form.data])
+
   async function handleSalvar() {
+    if (!form.data) {
+      toast.error('Selecione a data.')
+      return
+    }
+
+    if (!form.horaInicio) {
+      toast.error('Selecione o horário.')
+      return
+    }
+
+    if (!form.capacidadeMaxima || Number(form.capacidadeMaxima) < 2 || Number(form.capacidadeMaxima) > 5) {
+      toast.error('A capacidade máxima deve estar entre 2 e 5.')
+      return
+    }
+
+    const horaFimCalculada = somarHoras(form.horaInicio, 2)
+
     setLoading(true)
     try {
       await apiClient.put(`/turmas/${turma.id}`, {
         data: form.data,
         horaInicio: form.horaInicio,
-        horaFim: form.horaFim,
+        horaFim: horaFimCalculada,
         capacidadeMaxima: Number(form.capacidadeMaxima),
       })
+
       toast.success('Turma atualizada!')
       await onAtualizar()
       onClose()
@@ -123,34 +234,70 @@ function EditarTurmaModal({ turma, onClose, onAtualizar }) {
 
         <div className="flex flex-col gap-4">
           <div>
-            <label className="text-xs text-muted-foreground font-body mb-1 block">Data</label>
+            <label className="text-xs text-muted-foreground font-body mb-1 block">
+              Data
+            </label>
             <input
               type="date"
               value={form.data}
-              onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  data: e.target.value,
+                  horaInicio: '',
+                  horaFim: '',
+                }))
+              }
               className="w-full border border-input rounded-lg px-3 py-2 text-sm bg-background"
             />
           </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground font-body mb-1 block">Hora início</label>
-              <input
-                type="time"
-                value={form.horaInicio}
-                onChange={(e) => setForm((f) => ({ ...f, horaInicio: e.target.value }))}
-                className="w-full border border-input rounded-lg px-3 py-2 text-sm bg-background"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground font-body mb-1 block">Hora fim</label>
-              <input
-                type="time"
-                value={form.horaFim}
-                onChange={(e) => setForm((f) => ({ ...f, horaFim: e.target.value }))}
-                className="w-full border border-input rounded-lg px-3 py-2 text-sm bg-background"
-              />
-            </div>
+          <div>
+            <label className="text-xs text-muted-foreground font-body mb-1 block">
+              Horário
+            </label>
+            <select
+              value={form.horaInicio}
+              onChange={(e) => {
+                const horaSelecionada = e.target.value
+
+                setForm((f) => ({
+                  ...f,
+                  horaInicio: horaSelecionada,
+                  horaFim: somarHoras(horaSelecionada, 2),
+                }))
+              }}
+              disabled={!form.data || loadingHorarios}
+              className="w-full border border-input rounded-lg px-3 py-2 text-sm bg-background disabled:opacity-60"
+            >
+              <option value="">
+                {loadingHorarios
+                  ? 'Carregando horários...'
+                  : !form.data
+                    ? 'Selecione a data'
+                    : horariosDisponiveis.length === 0
+                      ? 'Sem horários disponíveis'
+                      : 'Selecione o horário'}
+              </option>
+
+              {horariosDisponiveis.map((hora) => (
+                <option key={hora} value={hora}>
+                  {hora}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground font-body mb-1 block">
+              Hora fim
+            </label>
+            <input
+              type="text"
+              value={form.horaFim}
+              readOnly
+              className="w-full border border-input rounded-lg px-3 py-2 text-sm bg-muted text-muted-foreground"
+            />
           </div>
 
           <div>
@@ -162,7 +309,12 @@ function EditarTurmaModal({ turma, onClose, onAtualizar }) {
               min={2}
               max={5}
               value={form.capacidadeMaxima}
-              onChange={(e) => setForm((f) => ({ ...f, capacidadeMaxima: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  capacidadeMaxima: e.target.value,
+                }))
+              }
               className="w-full border border-input rounded-lg px-3 py-2 text-sm bg-background"
             />
           </div>
@@ -177,7 +329,11 @@ function EditarTurmaModal({ turma, onClose, onAtualizar }) {
             {loading && <Loader2 size={14} className="animate-spin" />}
             Salvar
           </button>
-          <button onClick={onClose} className="text-sm border border-border px-4 py-2 rounded-lg hover:bg-muted">
+
+          <button
+            onClick={onClose}
+            className="text-sm border border-border px-4 py-2 rounded-lg hover:bg-muted"
+          >
             Cancelar
           </button>
         </div>
@@ -619,7 +775,7 @@ function TurmaCard({ turma, isGerente, onVerDetalhes, onEntrar, onSair, onAprova
   const [showMotivo, setShowMotivo] = useState(false)
   const [motivo, setMotivo] = useState('')
 
-  const isPendente = turma?.status === 'pendente_aprovacao'
+  const isPendente = turma?.status === 'pendente aprovacao'
   const isAprovado = turma?.status === 'aprovado'
   const participando = turma?.participando === true
   const quantidadeParticipantes = getQuantidadeParticipantes(turma)

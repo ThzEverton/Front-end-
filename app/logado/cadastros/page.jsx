@@ -14,6 +14,8 @@ import {
   Scissors,
   Package,
   Calendar,
+  Cake,
+  MessageCircle,
 } from 'lucide-react'
 
 const ABAS = [
@@ -24,11 +26,12 @@ const ABAS = [
 ]
 
 // ─── Usuários ────────────────────────────────────────────────────────────────
-
 function UsuariosTab() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
+  const [filtroConsultora, setFiltroConsultora] = useState(false)
+  const [filtroAniversario, setFiltroAniversario] = useState(false)
 
   async function fetchUsuarios() {
     setLoading(true)
@@ -59,12 +62,50 @@ function UsuariosTab() {
     }
   }
 
+  const mesAtual = new Date().getMonth() + 1
+
+  const usuariosFiltrados = usuarios.filter((u) => {
+    if (filtroConsultora && !u.isConsultora && !u.is_consultora) return false
+    if (filtroAniversario) {
+      if (!u.dataNascimento) return false
+      const mes = parseInt(u.dataNascimento.split('-')[1], 10)
+      if (mes !== mesAtual) return false
+    }
+    return true
+  })
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <p className="text-sm text-muted-foreground font-body">
-          {usuarios.length} usuário(s)
-        </p>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm text-muted-foreground font-body">
+            {usuariosFiltrados.length} usuário(s)
+          </p>
+
+          <button
+            onClick={() => setFiltroConsultora((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-body border transition-colors ${
+              filtroConsultora
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'border-border text-muted-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Users size={13} />
+            Consultoras
+          </button>
+
+          <button
+            onClick={() => setFiltroAniversario((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-body border transition-colors ${
+              filtroAniversario
+                ? 'bg-pink-100 text-pink-700 border-pink-300'
+                : 'border-border text-muted-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Cake size={13} />
+            Aniversariantes
+          </button>
+        </div>
 
         <button
           onClick={() => setModal({})}
@@ -78,7 +119,7 @@ function UsuariosTab() {
         <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-primary" size={24} />
         </div>
-      ) : usuarios.length === 0 ? (
+      ) : usuariosFiltrados.length === 0 ? (
         <p className="text-center py-10 text-muted-foreground font-body">
           Nenhum usuário.
         </p>
@@ -97,40 +138,72 @@ function UsuariosTab() {
             </thead>
 
             <tbody>
-              {usuarios.map((u, i) => (
-                <tr key={u?.id || i} className="border-t border-border hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-medium">{u.nome}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{u.email}</td>
-                  <td className="px-4 py-2.5 capitalize">{u.perfil || '-'}</td>
-                  <td className="px-4 py-2.5">
-                    {u.isConsultora || u.is_consultora ? 'Sim' : 'Não'}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => toggleAtivo(u.id)}
-                      className="flex items-center gap-1 text-xs"
-                    >
-                      {u.ativo !== false && u.ativo !== 0 ? (
-                        <>
-                          <ToggleRight size={18} className="text-green-600" /> Ativo
-                        </>
-                      ) : (
-                        <>
-                          <ToggleLeft size={18} className="text-muted-foreground" /> Inativo
-                        </>
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => setModal(u)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {usuariosFiltrados.map((u, i) => {
+                const isAniversariante = (() => {
+                  if (!u.dataNascimento) return false
+                  const mes = parseInt(u.dataNascimento.split('-')[1], 10)
+                  return mes === mesAtual
+                })()
+
+                const mensagemAniversario = `Olá ${u.nome.split(' ')[0]}! 🎂 Feliz aniversário! Que seu dia seja incrível!`
+
+                return (
+                  <tr key={u?.id || i} className="border-t border-border hover:bg-muted/30">
+                    <td className="px-4 py-2.5 font-medium">
+                      <span className="flex items-center gap-1.5">
+                        {u.nome}
+                        {isAniversariante && (
+                          <span title="Aniversariante do mês">
+                            <Cake size={14} className="text-pink-500" />
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{u.email}</td>
+                    <td className="px-4 py-2.5 capitalize">{u.perfil || '-'}</td>
+                    <td className="px-4 py-2.5">
+                      {u.isConsultora || u.is_consultora ? 'Sim' : 'Não'}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => toggleAtivo(u.id)}
+                        className="flex items-center gap-1 text-xs"
+                      >
+                        {u.ativo !== false && u.ativo !== 0 ? (
+                          <>
+                            <ToggleRight size={18} className="text-green-600" /> Ativo
+                          </>
+                        ) : (
+                          <>
+                            <ToggleLeft size={18} className="text-muted-foreground" /> Inativo
+                          </>
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setModal(u)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Editar
+                        </button>
+                        {isAniversariante && u.telefone && (
+                          <a
+                            href={`https://wa.me/55${u.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(mensagemAniversario)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Enviar parabéns via WhatsApp"
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <MessageCircle size={15} />
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

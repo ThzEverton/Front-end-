@@ -92,58 +92,41 @@ function extrairDataISO(dataHora) {
   } catch { /* empty */ }
   return ''
 }
-
 function normalizarAgendamento(item) {
-  const cliente =
-    item?.cliente ||
-    item?.usuario ||
-    item?.aluno ||
-    item?.participante ||
-    item?.criadoPor ||
-    item?.CriadoPor ||
-    null
+  const participante = item?.participante || null
+  const criador      = item?.criadoPor    || null
+  const cliente      = participante || criador
 
   return {
     ...item,
     cliente,
-    clienteId: item?.clienteId || cliente?.id || null,
-    clienteNome: item?.clienteNome || cliente?.nome || '-',
-    clienteEmail: item?.clienteEmail || cliente?.email || '',
-    telefone: item?.telefone || cliente?.telefone || '',
-    servicoNome: item?.servicoNome || item?.servico?.nome || '-',
-    horario: item?.horario || item?.horaInicio || '',
-    dataHora: item?.dataHora || montarDataHora(item?.data, item?.horario || item?.horaInicio),
-    status: normalizarStatus(item?.status),
-    tipo: item?.tipo || 'individual',
+    clienteId:    participante?.id       || criador?.id       || null,
+    clienteNome:  participante?.nome     || criador?.nome     || '-',
+    clienteEmail: participante?.email    || criador?.email    || '',
+    telefone:     participante?.telefone || criador?.telefone || '',
+    servicoNome:  item?.servico?.nome    || '-',
+    horario:      item?.horaInicio       || '',
+    dataHora:     montarDataHora(item?.data, item?.horaInicio),
+    status:       normalizarStatus(item?.status),
+    tipo:         item?.tipo             || 'individual',
   }
 }
-
 function pertenceAoUsuario(agendamento, user) {
   if (!user) return true
-  const userId = user?.id
+  const userId    = user?.id
   const userEmail = String(user?.email || '').toLowerCase()
 
   const ids = [
+    agendamento?.participante?.id,  // ← prioridade
     agendamento?.clienteId,
-    agendamento?.cliente?.id,
-    agendamento?.usuario?.id,
-    agendamento?.aluno?.id,
-    agendamento?.participante?.id,
     agendamento?.criadoPor?.id,
-    agendamento?.CriadoPor?.id,
   ].filter(Boolean)
 
   const emails = [
-    agendamento?.clienteEmail,
-    agendamento?.cliente?.email,
-    agendamento?.usuario?.email,
-    agendamento?.aluno?.email,
     agendamento?.participante?.email,
+    agendamento?.clienteEmail,
     agendamento?.criadoPor?.email,
-    agendamento?.CriadoPor?.email,
-  ]
-    .filter(Boolean)
-    .map((e) => String(e).toLowerCase())
+  ].filter(Boolean).map(e => String(e).toLowerCase())
 
   if (userId && ids.includes(userId)) return true
   if (userEmail && emails.includes(userEmail)) return true
