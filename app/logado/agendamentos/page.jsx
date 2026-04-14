@@ -579,7 +579,7 @@ export default function AgendamentosPage() {
 
   async function handleCancelar(id) {
     try {
-      await apiClient.patch(`/agendamentos/${id}/cancelar`)
+       await apiClient.put(`/agendamentos/${id}/cancelar`);
       toast.success('Agendamento cancelado.')
       await fetchAgendamentos()
       setSelecionado((atual) => atual?.id === id ? { ...atual, status: 'CANCELADO' } : atual)
