@@ -77,39 +77,31 @@ function ConfigModal({ config, onClose, onSave }) {
       toast.error('Preencha o horário de início e fim dos dias úteis.')
       return false
     }
-
     if (timeToMinutes(fimSemana) <= timeToMinutes(inicioSemana)) {
       toast.error('Nos dias úteis, o horário de fim deve ser maior que o horário de início.')
       return false
     }
-
     const duracaoNumero = Number(duracao)
-
     if (!duracaoNumero || duracaoNumero < 15) {
       toast.error('A duração do slot deve ser de no mínimo 15 minutos.')
       return false
     }
-
     if (duracaoNumero % 15 !== 0) {
       toast.error('A duração do slot deve ser múltipla de 15 minutos.')
       return false
     }
-
     const preencheuInicio = !!inicioFimSemana
     const preencheuFim = !!fimFimSemana
-
     if ((preencheuInicio && !preencheuFim) || (!preencheuInicio && preencheuFim)) {
       toast.error('Para configurar fim de semana, preencha início e fim.')
       return false
     }
-
     if (preencheuInicio && preencheuFim) {
       if (timeToMinutes(fimFimSemana) <= timeToMinutes(inicioFimSemana)) {
         toast.error('No fim de semana, o horário de fim deve ser maior que o horário de início.')
         return false
       }
     }
-
     return true
   }
 
@@ -198,7 +190,7 @@ function ConfigModal({ config, onClose, onSave }) {
   )
 }
 
-function AgendarModal({ slot, data, servicos, isGerente, onClose, onConfirm }) {
+function AgendarModal({ slot, data, servicos, slots, isGerente, onClose, onConfirm }) {
   const [servicoId, setServicoId] = useState('')
   const [tipo, setTipo] = useState('individual')
   const [passo, setPasso] = useState(1)
@@ -221,10 +213,27 @@ function AgendarModal({ slot, data, servicos, isGerente, onClose, onConfirm }) {
       .finally(() => setLoadingClientes(false))
   }, [isGerente])
 
+  function proximoSlotDisponivel() {
+    const horaAtual = getHoraSlot(slot)
+    const idx = slots.findIndex((s) => getHoraSlot(s) === horaAtual)
+    if (idx === -1 || idx + 1 >= slots.length) return false
+    const proximo = slots[idx + 1]
+    return proximo?.status === 'disponivel'
+  }
+
   function handleProximo(e) {
     e.preventDefault()
     if (!servicoId) { toast.error('Selecione um serviço.'); return }
-    if (tipo === 'turma') { setPasso(2); return }
+
+    if (tipo === 'turma') {
+      if (!proximoSlotDisponivel()) {
+        toast.error('Turmas ocupam 2 horários consecutivos. O próximo horário não está disponível.')
+        return
+      }
+      setPasso(2)
+      return
+    }
+
     handleSubmit()
   }
 
@@ -245,6 +254,8 @@ function AgendarModal({ slot, data, servicos, isGerente, onClose, onConfirm }) {
     await handleSubmit()
   }
 
+  const turmaIndisponivel = tipo === 'turma' && !proximoSlotDisponivel()
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
       <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl animate-fade-in">
@@ -264,7 +275,6 @@ function AgendarModal({ slot, data, servicos, isGerente, onClose, onConfirm }) {
         {passo === 1 && (
           <form onSubmit={handleProximo} className="flex flex-col gap-4">
 
-            {/* Seleção de cliente — somente gerente */}
             {isGerente && (
               <div>
                 <label className="block text-sm font-medium font-body mb-1.5">
@@ -314,6 +324,11 @@ function AgendarModal({ slot, data, servicos, isGerente, onClose, onConfirm }) {
                   </button>
                 ))}
               </div>
+              {turmaIndisponivel && (
+                <p className="text-xs text-destructive font-body mt-2 bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
+                 O próximo horário não está disponível. Turmas ocupam 2 slots consecutivos.
+                </p>
+              )}
             </div>
 
             <div className="flex gap-3 mt-2">
@@ -511,158 +526,156 @@ export default function AgendaPage() {
           toast.success('Você entrou na turma com sucesso!')
         }
       } else {
-        // gerente agendando para outro usuário
         if (isGerente && paraUserId) {
-          
           await apiClient.post('/agendamentos/gerente', {
             data,
             horaInicio: getHoraSlot(slot),
             servicoId: servicoIdNum,
             paraUserId: Number(paraUserId),
-            
           })
           console.log('isGerente:', isGerente, '| paraUserId:', paraUserId);
         } else {
-          // cliente agendando pra si mesmo OU gerente deixou "Mim mesmo"
           await apiClient.post('/agendamentos', {
             data,
             horaInicio: getHoraSlot(slot),
             servicoId: servicoIdNum,
           })
-        }}
-
-        fetchSlots(selectedDate)
-      } catch (error) {
-        const msg = error?.response?.data?.msg || error?.message || 'Erro ao realizar agendamento.'
-        console.error(msg)
-        toast.error(msg)
+        }
       }
+
+      fetchSlots(selectedDate)
+    } catch (error) {
+      const msg = error?.response?.data?.msg || error?.message || 'Erro ao realizar agendamento.'
+      console.error(msg)
+      toast.error(msg)
     }
+  }
 
   function slotColor(slot) {
-      if (isBloqueado(slot)) return 'bg-muted text-muted-foreground border-border'
-      if (isOcupado(slot)) return 'bg-primary/10 text-primary border-primary/20'
-      return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer'
-    }
+    if (isBloqueado(slot)) return 'bg-muted text-muted-foreground border-border'
+    if (isOcupado(slot)) return 'bg-primary/10 text-primary border-primary/20'
+    return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer'
+  }
 
-    return (
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="font-sans text-3xl font-bold text-foreground">Agenda</h1>
-            <p className="text-muted-foreground font-body mt-1 text-sm">
-              Visualize e gerencie os horários disponíveis
-            </p>
-          </div>
-
-          {isGerente && (
-            <button onClick={() => setShowConfig(true)}
-              className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors">
-              <Settings size={16} /> Configurar agenda
-            </button>
-          )}
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground">Agenda</h1>
+          <p className="text-muted-foreground font-body mt-1 text-sm">
+            Visualize e gerencie os horários disponíveis
+          </p>
         </div>
 
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => changeDate(-1)}
-            className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label="Dia anterior">
-            <ChevronLeft size={18} />
+        {isGerente && (
+          <button onClick={() => setShowConfig(true)}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors">
+            <Settings size={16} /> Configurar agenda
           </button>
-
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-            className="border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
-
-          <button onClick={() => changeDate(1)}
-            className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label="Próximo dia">
-            <ChevronRight size={18} />
-          </button>
-
-          <span className="text-sm text-muted-foreground font-body hidden sm:block">
-            {formatDate(selectedDate)}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap gap-4 mb-6 text-xs font-body">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-green-200 inline-block" /> Disponível
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Ocupado
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-muted inline-block" /> Bloqueado
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 size={32} className="animate-spin text-primary" />
-          </div>
-        ) : slots.length === 0 ? (
-          <div className="text-center py-16 bg-card border border-border rounded-xl">
-            <p className="text-muted-foreground font-body">Nenhum slot configurado para esta data.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {slots.map((slot, i) => {
-              const bloqueado = slot?.status === 'bloqueado'
-              const ocupado = slot?.status === 'ocupado'
-              const disponivel = slot?.status === 'disponivel'
-              const hora = getHoraSlot(slot)
-
-              return (
-                <div key={i}
-                  className={`border rounded-xl px-3 py-3 flex flex-col items-center gap-2 transition-colors text-sm font-body ${slotColor(slot)}`}
-                  onClick={() => { if (disponivel) setAgendarSlot(slot) }}
-                >
-                  <span className="font-medium">{hora}</span>
-
-                  {bloqueado && (
-                    <span className="text-xs flex items-center gap-1">
-                      <Lock size={10} /> Bloqueado
-                    </span>
-                  )}
-
-                  {ocupado && (
-                    <span className="text-xs">
-                      {slot?.clienteNome || slot?.cliente?.nome || 'Ocupado'}
-                    </span>
-                  )}
-
-                  {isGerente && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleToggleBloqueio(slot) }}
-                      className="mt-1 text-xs flex items-center gap-1 underline opacity-70 hover:opacity-100"
-                    >
-                      {bloqueado ? <><Unlock size={10} /> Liberar</> : <><Lock size={10} /> Bloquear</>}
-                    </button>
-                  )}
-
-                  {disponivel && !isGerente && (
-                    <span className="text-xs flex items-center gap-1">
-                      <Plus size={10} /> Agendar
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {showConfig && (
-          <ConfigModal config={config} onClose={() => setShowConfig(false)} onSave={handleSaveConfig} />
-        )}
-
-        {agendarSlot && (
-          <AgendarModal
-            slot={agendarSlot}
-            data={selectedDate}
-            servicos={servicos}
-            isGerente={isGerente}
-            onClose={() => setAgendarSlot(null)}
-            onConfirm={handleAgendar}
-          />
         )}
       </div>
-    )
-  }
+
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => changeDate(-1)}
+          className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label="Dia anterior">
+          <ChevronLeft size={18} />
+        </button>
+
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+          className="border border-input rounded-lg px-4 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
+
+        <button onClick={() => changeDate(1)}
+          className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label="Próximo dia">
+          <ChevronRight size={18} />
+        </button>
+
+        <span className="text-sm text-muted-foreground font-body hidden sm:block">
+          {formatDate(selectedDate)}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-4 mb-6 text-xs font-body">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-green-200 inline-block" /> Disponível
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Ocupado
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-muted inline-block" /> Bloqueado
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 size={32} className="animate-spin text-primary" />
+        </div>
+      ) : slots.length === 0 ? (
+        <div className="text-center py-16 bg-card border border-border rounded-xl">
+          <p className="text-muted-foreground font-body">Nenhum slot configurado para esta data.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {slots.map((slot, i) => {
+            const bloqueado = slot?.status === 'bloqueado'
+            const ocupado = slot?.status === 'ocupado'
+            const disponivel = slot?.status === 'disponivel'
+            const hora = getHoraSlot(slot)
+
+            return (
+              <div key={i}
+                className={`border rounded-xl px-3 py-3 flex flex-col items-center gap-2 transition-colors text-sm font-body ${slotColor(slot)}`}
+                onClick={() => { if (disponivel) setAgendarSlot(slot) }}
+              >
+                <span className="font-medium">{hora}</span>
+
+                {bloqueado && (
+                  <span className="text-xs flex items-center gap-1">
+                    <Lock size={10} /> Bloqueado
+                  </span>
+                )}
+
+                {ocupado && (
+                  <span className="text-xs">
+                    {slot?.clienteNome || slot?.cliente?.nome || 'Ocupado'}
+                  </span>
+                )}
+
+                {isGerente && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleBloqueio(slot) }}
+                    className="mt-1 text-xs flex items-center gap-1 underline opacity-70 hover:opacity-100"
+                  >
+                    {bloqueado ? <><Unlock size={10} /> Liberar</> : <><Lock size={10} /> Bloquear</>}
+                  </button>
+                )}
+
+                {disponivel && !isGerente && (
+                  <span className="text-xs flex items-center gap-1">
+                    <Plus size={10} /> Agendar
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {showConfig && (
+        <ConfigModal config={config} onClose={() => setShowConfig(false)} onSave={handleSaveConfig} />
+      )}
+
+      {agendarSlot && (
+        <AgendarModal
+          slot={agendarSlot}
+          data={selectedDate}
+          servicos={servicos}
+          slots={slots}
+          isGerente={isGerente}
+          onClose={() => setAgendarSlot(null)}
+          onConfirm={handleAgendar}
+        />
+      )}
+    </div>
+  )
+}
