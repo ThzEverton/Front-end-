@@ -1,9 +1,9 @@
 'use client'
-
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/context/userContext'
 import Sidebar from '@/components/Sidebar'
+import { RelatorioProvider } from '@/components/Relatorios'
 import { Loader2 } from 'lucide-react'
 
 export default function LogadoLayout({ children }) {
@@ -30,16 +30,18 @@ export default function LogadoLayout({ children }) {
   if (!isAuthenticated) return null
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      {/* Offset para sidebar desktop */}
-      <main className="flex-1 md:ml-64 min-h-screen">
-        {/* Mobile top spacing */}
-        <div className="md:hidden h-14" />
-        <div className="p-6 max-w-7xl mx-auto animate-fade-in">
-          {children}
-        </div>
-      </main>
-    </div>
+    <RelatorioProvider>
+      <div className="flex min-h-screen bg-background">
+        <Sidebar />
+        {/* Offset para sidebar desktop */}
+        <main className="flex-1 md:ml-64 min-h-screen">
+          {/* Mobile top spacing */}
+          <div className="md:hidden h-14" />
+          <div className="p-6 max-w-7xl mx-auto animate-fade-in">
+            {children}
+          </div>
+        </main>
+      </div>
+    </RelatorioProvider>
   )
 }

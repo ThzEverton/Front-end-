@@ -3,15 +3,16 @@
 import { useEffect, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { formatCurrency, formatDate, exportCSV } from '@/utils/helpers'
+import { useRelatorio } from '@/components/Relatorios'
 import { Loader2, Download, Wallet, X, TrendingUp, ShoppingBag, CalendarCheck } from 'lucide-react'
 
-// status vem em minúsculo do repo: "pago", "pendente", "cancelado", "estornado"
 const STATUS_CONFIG = {
   pago:      { label: 'Pago',      cls: 'bg-green-100 text-green-700' },
   pendente:  { label: 'Pendente',  cls: 'bg-yellow-100 text-yellow-700' },
   cancelado: { label: 'Cancelado', cls: 'bg-red-100 text-red-700' },
   estornado: { label: 'Estornado', cls: 'bg-gray-100 text-gray-500' },
 }
+
 
 // formaPagto vem em minúsculo do repo
 const FORMA_CONFIG = {
@@ -21,6 +22,7 @@ const FORMA_CONFIG = {
 }
 
 export default function FinanceiroPage() {
+  const { abrirRelatorio } = useRelatorio()
   const [registros, setRegistros] = useState([])
   const [resumo, setResumo] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -64,21 +66,19 @@ export default function FinanceiroPage() {
     }
   }
 
-  function handleExportCSV() {
-    const pagos = registros.filter((r) => r?.status === 'pago')
-    if (pagos.length === 0) return
-    exportCSV(
-      pagos.map((r) => ({
-        Data:      formatDate(r?.dataRef),
-        Descricao: r?.descricao || '-',
-        Tipo:      'RECEITA',
-        Forma:     r?.formaPagto || '-',
-        Valor:     r?.valor,
-        Status:    r?.status,
-      })),
-      'financeiro_sala_rosa.csv'
-    )
-  }
+  // troca a função handleExportCSV
+function handleExportCSV() {
+  const pagos = registros.filter((r) => r?.status === 'pago')
+  if (pagos.length === 0) return
+
+  abrirRelatorio({
+    registros:   pagos,
+    titulo:      'Relatório de Recebimentos',
+    eyebrow:     'Sala Rosa · Financeiro',
+    accentColor: '#d4537e',
+    nomeArquivo: 'financeiro_sala_rosa.csv',
+  })
+}
 
   const temFiltro = filtroStatus || filtroInicio || filtroFim
 

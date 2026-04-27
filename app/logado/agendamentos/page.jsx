@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useUser } from '@/context/userContext'
 import apiClient from '@/utils/apiClient'
 import DisparoEmMassa from '@/components/DisparoEmMassa'
+import { useRelatorio } from '@/components/Relatorios'
 import {
   formatDate,
   statusAgendamentoLabel,
@@ -20,6 +21,7 @@ import {
   Clock,
   CalendarDays,
   ChevronRight,
+   Download
 } from 'lucide-react'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -94,26 +96,26 @@ function extrairDataISO(dataHora) {
 }
 function normalizarAgendamento(item) {
   const participante = item?.participante || null
-  const criador      = item?.criadoPor    || null
-  const cliente      = participante || criador
+  const criador = item?.criadoPor || null
+  const cliente = participante || criador
 
   return {
     ...item,
     cliente,
-    clienteId:    participante?.id       || criador?.id       || null,
-    clienteNome:  participante?.nome     || criador?.nome     || '-',
-    clienteEmail: participante?.email    || criador?.email    || '',
-    telefone:     participante?.telefone || criador?.telefone || '',
-    servicoNome:  item?.servico?.nome    || '-',
-    horario:      item?.horaInicio       || '',
-    dataHora:     montarDataHora(item?.data, item?.horaInicio),
-    status:       normalizarStatus(item?.status),
-    tipo:         item?.tipo             || 'individual',
+    clienteId: participante?.id || criador?.id || null,
+    clienteNome: participante?.nome || criador?.nome || '-',
+    clienteEmail: participante?.email || criador?.email || '',
+    telefone: participante?.telefone || criador?.telefone || '',
+    servicoNome: item?.servico?.nome || '-',
+    horario: item?.horaInicio || '',
+    dataHora: montarDataHora(item?.data, item?.horaInicio),
+    status: normalizarStatus(item?.status),
+    tipo: item?.tipo || 'individual',
   }
 }
 function pertenceAoUsuario(agendamento, user) {
   if (!user) return true
-  const userId    = user?.id
+  const userId = user?.id
   const userEmail = String(user?.email || '').toLowerCase()
 
   const ids = [
@@ -288,7 +290,7 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
   }
 
 
-<DisparoEmMassa />
+  <DisparoEmMassa />
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
       <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl animate-fade-in">
@@ -486,7 +488,7 @@ function SlotsDoDia() {
 
 export default function AgendamentosPage() {
   const { isGerente, user } = useUser()
-
+  const { abrirRelatorio } = useRelatorio()
   const [todosAgendamentos, setTodosAgendamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selecionado, setSelecionado] = useState(null)
@@ -576,10 +578,27 @@ export default function AgendamentosPage() {
       return false
     }
   }
-
+  function handleRelatorio() {
+    abrirRelatorio({
+      registros: agendamentos.map((a) => ({
+        dataRef: a?.dataHora || a?.data,
+        descricao: `${a?.servicoNome} — ${a?.clienteNome}`,
+        formaPagto: '-',
+        valor: 0,
+        status: a?.status?.toLowerCase(),
+        tipo: 'RECEITA',
+      })),
+      titulo: 'Relatório de Agendamentos',
+      eyebrow: 'Sala Rosa · Agenda',
+      statusFiltro: '',   // sem filtro — mostra todos
+      tipo: 'TODOS',
+      accentColor: '#d4537e',
+      nomeArquivo: 'agendamentos_sala_rosa.csv',
+    })
+  }
   async function handleCancelar(id) {
     try {
-       await apiClient.put(`/agendamentos/${id}/cancelar`);
+      await apiClient.put(`/agendamentos/${id}/cancelar`);
       toast.success('Agendamento cancelado.')
       await fetchAgendamentos()
       setSelecionado((atual) => atual?.id === id ? { ...atual, status: 'CANCELADO' } : atual)
@@ -604,10 +623,26 @@ export default function AgendamentosPage() {
       </div>
 
       {isGerente && <SlotsDoDia />}
-
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-sans text-3xl font-bold text-foreground">{tituloDescricao.titulo}</h1>
+            <p className="text-muted-foreground font-body mt-1 text-sm">{tituloDescricao.descricao}</p>
+          </div>
+          {isGerente && (
+            <button
+              onClick={handleRelatorio}
+              className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors"
+            >
+              <Download size={16} /> Relatório
+            </button>
+          )}
+        </div>
+      </div>
       <div className="bg-card border border-border rounded-xl p-4 mb-6">
+        
         <div className="flex flex-wrap gap-3 items-end">
-
+        
           <div>
             <label className="block text-xs font-body text-muted-foreground mb-1">Modo</label>
             <div className="flex rounded-lg overflow-hidden border border-input text-sm font-body">
@@ -627,7 +662,7 @@ export default function AgendamentosPage() {
               </button>
             </div>
           </div>
-
+          
           {!modoPeriodo ? (
             <div>
               <label className="block text-xs font-body text-muted-foreground mb-1">Data</label>
