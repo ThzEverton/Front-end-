@@ -90,12 +90,14 @@ function ConfigModal({ config, onClose, onSave }) {
       toast.error('A duração do slot deve ser múltipla de 15 minutos.')
       return false
     }
-    const preencheuInicio = !!inicioFimSemana
-    const preencheuFim = !!fimFimSemana
+    const preencheuInicio = !!inicioFimSemana && inicioFimSemana !== '00:00'
+    const preencheuFim = !!fimFimSemana && fimFimSemana !== '00:00'
+
     if ((preencheuInicio && !preencheuFim) || (!preencheuInicio && preencheuFim)) {
       toast.error('Para configurar fim de semana, preencha início e fim.')
       return false
     }
+
     if (preencheuInicio && preencheuFim) {
       if (timeToMinutes(fimFimSemana) <= timeToMinutes(inicioFimSemana)) {
         toast.error('No fim de semana, o horário de fim deve ser maior que o horário de início.')
@@ -326,7 +328,7 @@ function AgendarModal({ slot, data, servicos, slots, isGerente, onClose, onConfi
               </div>
               {turmaIndisponivel && (
                 <p className="text-xs text-destructive font-body mt-2 bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
-                 O próximo horário não está disponível. Turmas ocupam 2 slots consecutivos.
+                  O próximo horário não está disponível. Turmas ocupam 2 slots consecutivos.
                 </p>
               )}
             </div>

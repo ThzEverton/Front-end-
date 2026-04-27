@@ -21,7 +21,7 @@ import {
   Clock,
   CalendarDays,
   ChevronRight,
-   Download
+  Download,
 } from 'lucide-react'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -94,6 +94,7 @@ function extrairDataISO(dataHora) {
   } catch { /* empty */ }
   return ''
 }
+
 function normalizarAgendamento(item) {
   const participante = item?.participante || null
   const criador = item?.criadoPor || null
@@ -113,13 +114,14 @@ function normalizarAgendamento(item) {
     tipo: item?.tipo || 'individual',
   }
 }
+
 function pertenceAoUsuario(agendamento, user) {
   if (!user) return true
   const userId = user?.id
   const userEmail = String(user?.email || '').toLowerCase()
 
   const ids = [
-    agendamento?.participante?.id,  // ← prioridade
+    agendamento?.participante?.id,
     agendamento?.clienteId,
     agendamento?.criadoPor?.id,
   ].filter(Boolean)
@@ -128,7 +130,7 @@ function pertenceAoUsuario(agendamento, user) {
     agendamento?.participante?.email,
     agendamento?.clienteEmail,
     agendamento?.criadoPor?.email,
-  ].filter(Boolean).map(e => String(e).toLowerCase())
+  ].filter(Boolean).map((e) => String(e).toLowerCase())
 
   if (userId && ids.includes(userId)) return true
   if (userEmail && emails.includes(userEmail)) return true
@@ -229,9 +231,7 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
 
     try {
       const response = await apiClient.get(`/agenda/slots?date=${dataFormatada}`)
-
       const payload = extrairPayload(response)
-
       const lista = Array.isArray(payload)
         ? payload
         : payload?.slots || payload?.horarios || payload?.data || []
@@ -242,14 +242,10 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
 
       const livres = lista
         .filter((i) =>
-          typeof i === 'string'
-            ? true
-            : i?.bloqueado !== true && i?.ocupado !== true
+          typeof i === 'string' ? true : i?.bloqueado !== true && i?.ocupado !== true
         )
         .map((i) =>
-          typeof i === 'string'
-            ? formatarHorarioSeguro(i)
-            : formatarHorarioSeguro(i?.slot)
+          typeof i === 'string' ? formatarHorarioSeguro(i) : formatarHorarioSeguro(i?.slot)
         )
         .filter((h) => h && h !== '-' && h !== horarioAtual)
 
@@ -264,12 +260,17 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
 
   async function handleRemarcar(e) {
     e.preventDefault()
-    if (!novaData || !novoHorario) { toast.error('Selecione nova data e horário.'); return }
+    if (!novaData || !novoHorario) {
+      toast.error('Selecione nova data e horário.')
+      return
+    }
     setLoadingRe(true)
     try {
       const ok = await onRemarcar(agendamento.id, { novaData, novoHorario })
       if (ok) onClose()
-    } finally { setLoadingRe(false) }
+    } finally {
+      setLoadingRe(false)
+    }
   }
 
   async function handleCancelar() {
@@ -277,20 +278,25 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
     try {
       const ok = await onCancelar(agendamento.id)
       if (ok) onClose()
-    } finally { setLoadingCan(false) }
+    } finally {
+      setLoadingCan(false)
+    }
   }
 
   function handleWhatsApp() {
     const tel = normalizarTelefoneBR(telefoneBruto)
-    if (!tel) { toast.error('Telefone do cliente não encontrado.'); return }
+    if (!tel) {
+      toast.error('Telefone do cliente não encontrado.')
+      return
+    }
     const msg = encodeURIComponent(
       `Olá, ${nomeCliente}! Passando para lembrar do seu agendamento de ${nomeServico} no dia ${dataAgendamento} às ${horarioAgendamento}.`
     )
     window.open(`https://wa.me/${tel}?text=${msg}`, '_blank')
   }
 
+  // ✅ CORRIGIDO: removida a linha solta <DisparoEmMassa /> que ficava antes do return
 
-  <DisparoEmMassa />
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
       <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl animate-fade-in">
@@ -369,9 +375,17 @@ function DetalheModal({ agendamento, isGerente, onClose, onRemarcar, onCancelar 
                   className="flex-1 border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body disabled:opacity-60"
                 >
                   <option value="">
-                    {loadingHorarios ? 'Carregando...' : !novaData ? 'Selecione a data' : horariosDisponiveis.length === 0 ? 'Sem horários' : 'Selecione o horário'}
+                    {loadingHorarios
+                      ? 'Carregando...'
+                      : !novaData
+                      ? 'Selecione a data'
+                      : horariosDisponiveis.length === 0
+                      ? 'Sem horários'
+                      : 'Selecione o horário'}
                   </option>
-                  {horariosDisponiveis.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horariosDisponiveis.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
                 </select>
               </div>
               <button
@@ -410,7 +424,6 @@ function SlotsDoDia() {
   const fetchSlots = useCallback(async (data) => {
     setLoading(true)
     try {
-      // ✅ FIX: API espera ?date=
       const response = await apiClient.get(`/agenda/slots?date=${data}`)
       const payload = extrairPayload(response)
       const lista = Array.isArray(payload)
@@ -421,7 +434,10 @@ function SlotsDoDia() {
         .map((item) =>
           typeof item === 'string'
             ? { horario: formatarHorarioSeguro(item), livre: true }
-            : { horario: formatarHorarioSeguro(item?.slot || item?.horario), livre: item?.bloqueado !== true && item?.ocupado !== true }
+            : {
+                horario: formatarHorarioSeguro(item?.slot || item?.horario),
+                livre: item?.bloqueado !== true && item?.ocupado !== true,
+              }
         )
         .filter((s) => s.horario && s.horario !== '-')
 
@@ -433,7 +449,9 @@ function SlotsDoDia() {
     }
   }, [])
 
-  useEffect(() => { fetchSlots(dataSelecionada) }, [dataSelecionada, fetchSlots])
+  useEffect(() => {
+    fetchSlots(dataSelecionada)
+  }, [dataSelecionada, fetchSlots])
 
   const livres = slots.filter((s) => s.livre)
   const ocupados = slots.filter((s) => !s.livre)
@@ -464,16 +482,19 @@ function SlotsDoDia() {
           <span className="text-xs text-muted-foreground font-body">Carregando horários...</span>
         </div>
       ) : slots.length === 0 ? (
-        <p className="text-xs text-muted-foreground font-body py-1">Nenhum horário cadastrado para este dia.</p>
+        <p className="text-xs text-muted-foreground font-body py-1">
+          Nenhum horário cadastrado para este dia.
+        </p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {slots.map((s) => (
             <span
               key={s.horario}
-              className={`text-xs px-2.5 py-1 rounded-full font-body font-medium ${s.livre
-                ? 'bg-green-100 text-green-700 border border-green-200'
-                : 'bg-muted text-muted-foreground border border-border line-through'
-                }`}
+              className={`text-xs px-2.5 py-1 rounded-full font-body font-medium ${
+                s.livre
+                  ? 'bg-green-100 text-green-700 border border-green-200'
+                  : 'bg-muted text-muted-foreground border border-border line-through'
+              }`}
             >
               {s.horario}
             </span>
@@ -525,16 +546,16 @@ export default function AgendamentosPage() {
       const listaBruta = Array.isArray(payload)
         ? payload
         : payload?.agendamentos ||
-        payload?.agendamento ||
-        payload?.items ||
-        payload?.rows ||
-        payload?.result ||
-        payload?.results ||
-        payload?.data?.agendamentos ||
-        payload?.data?.items ||
-        payload?.data?.rows ||
-        payload?.data ||
-        []
+          payload?.agendamento ||
+          payload?.items ||
+          payload?.rows ||
+          payload?.result ||
+          payload?.results ||
+          payload?.data?.agendamentos ||
+          payload?.data?.items ||
+          payload?.data?.rows ||
+          payload?.data ||
+          []
 
       const listaNormalizada = Array.isArray(listaBruta)
         ? listaBruta.map(normalizarAgendamento)
@@ -547,14 +568,15 @@ export default function AgendamentosPage() {
       setTodosAgendamentos(listaFinal)
     } catch (error) {
       setTodosAgendamentos([])
-      // ✅ FIX: prioriza msg do backend
       toast.error(erroApi(error, 'Erro ao carregar agendamentos.'))
     } finally {
       setLoading(false)
     }
   }, [filtroData, filtroStatus, filtroTipo, modoPeriodo, isGerente, user])
 
-  useEffect(() => { fetchAgendamentos() }, [fetchAgendamentos])
+  useEffect(() => {
+    fetchAgendamentos()
+  }, [fetchAgendamentos])
 
   const agendamentos = useMemo(() => {
     if (!modoPeriodo) return todosAgendamentos
@@ -568,16 +590,23 @@ export default function AgendamentosPage() {
       await fetchAgendamentos()
       setSelecionado((atual) =>
         atual?.id === id
-          ? { ...atual, data: novaData, horario: novoHorario, horaInicio: novoHorario, dataHora: montarDataHora(novaData, novoHorario), status: 'REMARCADO' }
+          ? {
+              ...atual,
+              data: novaData,
+              horario: novoHorario,
+              horaInicio: novoHorario,
+              dataHora: montarDataHora(novaData, novoHorario),
+              status: 'REMARCADO',
+            }
           : atual
       )
       return true
     } catch (error) {
-      // ✅ FIX: prioriza msg do backend
       toast.error(erroApi(error, 'Não foi possível remarcar.'))
       return false
     }
   }
+
   function handleRelatorio() {
     abrirRelatorio({
       registros: agendamentos.map((a) => ({
@@ -590,21 +619,23 @@ export default function AgendamentosPage() {
       })),
       titulo: 'Relatório de Agendamentos',
       eyebrow: 'Sala Rosa · Agenda',
-      statusFiltro: '',   // sem filtro — mostra todos
+      statusFiltro: '',
       tipo: 'TODOS',
       accentColor: '#d4537e',
       nomeArquivo: 'agendamentos_sala_rosa.csv',
     })
   }
+
   async function handleCancelar(id) {
     try {
-      await apiClient.put(`/agendamentos/${id}/cancelar`);
+      await apiClient.put(`/agendamentos/${id}/cancelar`)
       toast.success('Agendamento cancelado.')
       await fetchAgendamentos()
-      setSelecionado((atual) => atual?.id === id ? { ...atual, status: 'CANCELADO' } : atual)
+      setSelecionado((atual) =>
+        atual?.id === id ? { ...atual, status: 'CANCELADO' } : atual
+      )
       return true
     } catch (error) {
-      // ✅ FIX: prioriza msg do backend
       toast.error(erroApi(error, 'Não foi possível cancelar.'))
       return false
     }
@@ -617,52 +648,64 @@ export default function AgendamentosPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-sans text-3xl font-bold text-foreground">{tituloDescricao.titulo}</h1>
-        <p className="text-muted-foreground font-body mt-1 text-sm">{tituloDescricao.descricao}</p>
+    
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground">{tituloDescricao.titulo}</h1>
+          <p className="text-muted-foreground font-body mt-1 text-sm">{tituloDescricao.descricao}</p>
+        </div>
+        {isGerente && (
+          <button
+            onClick={handleRelatorio}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors"
+          >
+            <Download size={16} /> Relatório
+          </button>
+        )}
       </div>
 
+      
       {isGerente && <SlotsDoDia />}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-sans text-3xl font-bold text-foreground">{tituloDescricao.titulo}</h1>
-            <p className="text-muted-foreground font-body mt-1 text-sm">{tituloDescricao.descricao}</p>
-          </div>
-          {isGerente && (
-            <button
-              onClick={handleRelatorio}
-              className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors"
-            >
-              <Download size={16} /> Relatório
-            </button>
-          )}
-        </div>
-      </div>
+      {isGerente && <DisparoEmMassa />}
+
+      {/* Filtros */}
       <div className="bg-card border border-border rounded-xl p-4 mb-6">
-        
         <div className="flex flex-wrap gap-3 items-end">
-        
           <div>
             <label className="block text-xs font-body text-muted-foreground mb-1">Modo</label>
             <div className="flex rounded-lg overflow-hidden border border-input text-sm font-body">
               <button
                 type="button"
-                onClick={() => { setModoPeriodo(false); setFiltroDataInicio(''); setFiltroDataFim('') }}
-                className={`px-3 py-2 transition-colors ${!modoPeriodo ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => {
+                  setModoPeriodo(false)
+                  setFiltroDataInicio('')
+                  setFiltroDataFim('')
+                }}
+                className={`px-3 py-2 transition-colors ${
+                  !modoPeriodo
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-foreground hover:bg-muted'
+                }`}
               >
                 Data
               </button>
               <button
                 type="button"
-                onClick={() => { setModoPeriodo(true); setFiltroData('') }}
-                className={`px-3 py-2 transition-colors ${modoPeriodo ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-muted'}`}
+                onClick={() => {
+                  setModoPeriodo(true)
+                  setFiltroData('')
+                }}
+                className={`px-3 py-2 transition-colors ${
+                  modoPeriodo
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-foreground hover:bg-muted'
+                }`}
               >
                 Período
               </button>
             </div>
           </div>
-          
+
           {!modoPeriodo ? (
             <div>
               <label className="block text-xs font-body text-muted-foreground mb-1">Data</label>
@@ -742,6 +785,7 @@ export default function AgendamentosPage() {
         </div>
       </div>
 
+      {/* Lista */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={32} className="animate-spin text-primary" />
@@ -769,7 +813,10 @@ export default function AgendamentosPage() {
               </thead>
               <tbody>
                 {agendamentos.map((a, i) => (
-                  <tr key={a?.id || i} className="border-t border-border hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={a?.id || i}
+                    className="border-t border-border hover:bg-muted/30 transition-colors"
+                  >
                     {isGerente && <td className="px-4 py-3">{a?.clienteNome || '-'}</td>}
                     <td className="px-4 py-3">{a?.servicoNome || '-'}</td>
                     <td className="px-4 py-3 text-muted-foreground">
