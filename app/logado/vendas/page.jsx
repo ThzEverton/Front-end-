@@ -1,24 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { toast } from 'sonner'
 import {
   Loader2, Plus, Trash2, X, ShoppingCart,
-  CreditCard, Banknote, QrCode, Eye, Package, Scissors, CheckCircle2
+  CreditCard, Banknote, QrCode, Eye, Package, Scissors,
+  CheckCircle2, ChevronLeft, ChevronRight, HelpCircle,
+  Lightbulb, Info
 } from 'lucide-react'
 
-// ─── helpers visuais ────────────────────────────────────────────────────────
-
 const FORMA_LABEL = { dinheiro: 'Dinheiro', cartao: 'Cartão', pix: 'PIX' }
-const FORMA_ICON  = { dinheiro: Banknote, cartao: CreditCard, pix: QrCode }
+const FORMA_ICON = { dinheiro: Banknote, cartao: CreditCard, pix: QrCode }
 
 const STATUS_STYLE = {
-  pendente:  'bg-yellow-100 text-yellow-700',
-  pago:      'bg-green-100  text-green-700',
-  cancelado: 'bg-red-100    text-red-700',
-  estornado: 'bg-gray-100   text-gray-600',
+  pendente: 'bg-yellow-100 text-yellow-700',
+  pago: 'bg-green-100 text-green-700',
+  cancelado: 'bg-red-100 text-red-700',
+  estornado: 'bg-gray-100 text-gray-600',
 }
 
 function StatusBadge({ status }) {
@@ -38,23 +38,254 @@ function FormaBadge({ forma }) {
   ) : <span className="text-xs text-muted-foreground">—</span>
 }
 
-// ─── Modal: Detalhe da Venda ─────────────────────────────────────────────────
+// ─── TOUR TOOLTIP ────────────────────────────────────────────────────────────
+
+function TourTooltip({ steps, index, onNext, onPrev, onStop }) {
+  const tooltipRef = useRef(null)
+  const [targetRect, setTargetRect] = useState(null)
+  const [pos, setPos] = useState({ top: 20, left: 20 })
+
+  const step = steps[index]
+  const total = steps.length
+  const isLast = index === total - 1
+  const TOOLTIP_W = 340
+  const GAP = 14
+  const PADDING = 12
+
+  useEffect(() => {
+    function updatePosition() {
+      const target = document.querySelector(step.selector)
+
+      if (!target) {
+        setTargetRect(null)
+        return
+      }
+
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+
+      setTimeout(() => {
+        const rect = target.getBoundingClientRect()
+        setTargetRect(rect)
+
+        const tooltipH = tooltipRef.current?.offsetHeight || 200
+
+        let top = rect.bottom + GAP
+        let left = rect.left + rect.width / 2 - TOOLTIP_W / 2
+
+        if (top + tooltipH > window.innerHeight - PADDING) top = rect.top - tooltipH - GAP
+        if (top < PADDING) top = PADDING
+        if (left < PADDING) left = PADDING
+        if (left + TOOLTIP_W > window.innerWidth - PADDING) left = window.innerWidth - TOOLTIP_W - PADDING
+
+        setPos({ top, left })
+      }, 260)
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [step])
+
+  if (!step || !targetRect) return null
+
+  return (
+    <>
+      {/* Overlay escuro com recorte */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }} aria-hidden="true">
+        <svg width="100%" height="100%">
+          <defs>
+            <mask id="tour-highlight-mask">
+              <rect width="100%" height="100%" fill="white" />
+              <rect
+                x={targetRect.left - 10}
+                y={targetRect.top - 10}
+                width={targetRect.width + 20}
+                height={targetRect.height + 20}
+                rx="10"
+                fill="black"
+              />
+            </mask>
+          </defs>
+          <rect width="100%" height="100%" fill="rgba(0,0,0,0.52)" mask="url(#tour-highlight-mask)" />
+          <rect
+            x={targetRect.left - 10}
+            y={targetRect.top - 10}
+            width={targetRect.width + 20}
+            height={targetRect.height + 20}
+            rx="10"
+            fill="none"
+            stroke="rgba(255,255,255,0.75)"
+            strokeWidth="2"
+            strokeDasharray="6 3"
+          />
+        </svg>
+      </div>
+
+      {/* Tooltip */}
+      <div
+        ref={tooltipRef}
+        role="dialog"
+        aria-modal="false"
+        aria-label={step.title}
+        style={{
+          position: 'fixed',
+          top: pos.top,
+          left: pos.left,
+          zIndex: 9999,
+          width: 'min(92vw, 340px)',
+          maxWidth: 'calc(100vw - 24px)',
+        }}
+        className="bg-card border border-border rounded-2xl shadow-2xl p-4 animate-fade-in"
+      >
+        {/* Cabeçalho */}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">
+              {index + 1}
+            </span>
+            <p className="font-sans font-bold text-sm text-card-foreground leading-snug">
+              {step.title}
+            </p>
+          </div>
+          <button
+            onClick={onStop}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+            aria-label="Fechar tour"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Descrição principal */}
+        <p className="text-xs text-muted-foreground font-body mb-2 leading-relaxed pl-7">
+          {step.body}
+        </p>
+
+        {/* Dica extra (opcional) */}
+        {step.tip && (
+          <div className="ml-7 mb-3 flex items-start gap-1.5 bg-primary/8 border border-primary/20 rounded-lg px-3 py-2">
+            <Lightbulb size={12} className="text-primary shrink-0 mt-0.5" />
+            <p className="text-[11px] text-primary font-body leading-relaxed">{step.tip}</p>
+          </div>
+        )}
+
+        {/* Progresso + botões */}
+        <div className="flex flex-col gap-3 pl-7">
+          <div className="flex items-center gap-1">
+            {Array.from({ length: total }).map((_, i) => (
+              <span
+                key={i}
+                className={`inline-block rounded-full transition-all shrink-0 ${
+                  i === index ? 'w-4 h-1.5 bg-primary' : i < index ? 'w-1.5 h-1.5 bg-primary/40' : 'w-1.5 h-1.5 bg-border'
+                }`}
+              />
+            ))}
+            <span className="ml-auto text-[10px] text-muted-foreground font-body">{index + 1}/{total}</span>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <button
+              onClick={onStop}
+              className="text-[11px] text-muted-foreground hover:text-foreground font-body underline underline-offset-2 transition-colors"
+            >
+              Pular tour
+            </button>
+
+            <div className="flex gap-2">
+              {index > 0 && (
+                <button
+                  onClick={onPrev}
+                  className="flex items-center gap-1 text-xs border border-border px-2.5 py-1.5 rounded-lg font-body hover:bg-muted transition-colors"
+                >
+                  <ChevronLeft size={12} /> Anterior
+                </button>
+              )}
+              <button
+                onClick={onNext}
+                className="flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2.5 py-1.5 rounded-lg font-body hover:opacity-90 transition-opacity"
+              >
+                {isLast ? <><CheckCircle2 size={12} /> Concluir</> : <>Próximo <ChevronRight size={12} /></>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── MODAL DETALHE VENDA ──────────────────────────────────────────────────────
 
 function DetalheVendaModal({ venda, onClose, onAtualizado }) {
   const [itens, setItens] = useState(venda?.itens || [])
   const [loadingItens, setLoadingItens] = useState(false)
-
-  // estado local do pagamento para refletir alterações sem fechar a modal
   const [formaPagto, setFormaPagto] = useState(venda?.formaPagto || '')
   const [statusPagto, setStatusPagto] = useState(venda?.statusPagto || 'pendente')
   const [editandoPagto, setEditandoPagto] = useState(false)
   const [loadingSalvar, setLoadingSalvar] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const detalheSteps = [
+    {
+      selector: '#tour-detalhe-header',
+      title: 'Identificação da venda',
+      body: 'Aqui você vê o número único da venda e a data em que ela foi registrada no sistema.',
+      tip: 'O número de ID é usado para rastrear a venda em relatórios e vincular a agendamentos.',
+    },
+    {
+      selector: '#tour-info-pagamento',
+      title: 'Resumo da venda',
+      body: 'Aqui ficam as principais informações: forma de pagamento escolhida, status atual, quem registrou (responsável) e o valor total da venda.',
+      tip: 'O responsável é o usuário logado no momento que a venda foi criada.',
+    },
+    {
+      selector: '#tour-forma-detalhe',
+      title: 'Forma de pagamento',
+      body: 'Exibe como o pagamento foi recebido: Dinheiro, Cartão ou PIX. Você pode alterar isso clicando em "Atualizar pagamento".',
+    },
+    {
+      selector: '#tour-status-detalhe',
+      title: 'Status do pagamento',
+      body: 'Indica a situação atual do pagamento. "Pendente" = ainda não recebido; "Pago" = recebido; "Cancelado" = venda cancelada; "Estornado" = valor devolvido ao cliente.',
+      tip: 'Mantenha o status sempre atualizado para um controle financeiro preciso.',
+    },
+    {
+      selector: '#tour-atualizar-pagamento',
+      title: 'Atualizar pagamento',
+      body: 'Use este botão para abrir os campos de edição e alterar a forma ou o status do pagamento. Após editar, clique em "Salvar" para confirmar.',
+      tip: 'O botão de salvar só é habilitado quando você fizer alguma alteração.',
+    },
+    {
+      selector: '#tour-observacao-detalhe',
+      title: 'Observação',
+      body: 'Campo de texto livre adicionado no momento da criação da venda. Pode conter informações extras como o tipo de atendimento ou instruções especiais.',
+    },
+    {
+      selector: '#tour-itens-venda',
+      title: 'Itens da venda',
+      body: 'Lista todos os produtos e serviços incluídos nesta venda, com quantidade, valor unitário e subtotal de cada item.',
+      tip: 'O subtotal de cada linha é calculado automaticamente: quantidade × valor unitário.',
+    },
+    {
+      selector: '#tour-total-detalhe',
+      title: 'Total da venda',
+      body: 'Valor final consolidado de todos os itens vendidos. Este é o valor que o cliente pagou (ou deve pagar).',
+    },
+  ]
+
+  // Filtra steps que têm o elemento no DOM
+  const stepsValidos = detalheSteps.filter(s => {
+    if (s.selector === '#tour-observacao-detalhe' && !venda?.observacao) return false
+    return true
+  })
 
   useEffect(() => {
-    if (venda?.itens?.length) {
-      setItens(venda.itens)
-      return
-    }
+    if (venda?.itens?.length) { setItens(venda.itens); return }
     setLoadingItens(true)
     apiClient.get(`/vendas/${venda.id}`)
       .then(data => setItens(data?.itens || []))
@@ -68,7 +299,7 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
       await apiClient.patch(`/vendas/${venda.id}/pagamento`, { formaPagto, statusPagto })
       toast.success('Pagamento atualizado com sucesso!')
       setEditandoPagto(false)
-      onAtualizado?.() // atualiza a listagem por trás
+      onAtualizado?.()
     } catch (err) {
       toast.error(err?.response?.data?.msg || 'Erro ao atualizar pagamento.')
     } finally {
@@ -81,32 +312,37 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
     : '—'
 
   const pagamentoAlterado = formaPagto !== venda?.formaPagto || statusPagto !== venda?.statusPagto
+  const valorTotal = venda?.valorTotal ?? venda?.total
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
       <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-xl animate-fade-in max-h-[90vh] flex flex-col">
 
-        {/* header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
+        {/* Header */}
+        <div id="tour-detalhe-header" className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
           <div>
-            <h3 className="font-sans text-lg font-bold text-card-foreground">
-              Venda #{venda.id}
-            </h3>
+            <h3 className="font-sans text-lg font-bold text-card-foreground">Venda #{venda.id}</h3>
             <p className="text-xs text-muted-foreground font-body mt-0.5">{data}</p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setTourIndex(0); setTourAtivo(true) }}
+              className="text-muted-foreground hover:text-primary transition-colors"
+              aria-label="Ajuda"
+            >
+              <HelpCircle size={17} />
+            </button>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* body */}
         <div className="overflow-y-auto flex-1 px-6 py-4 flex flex-col gap-4">
 
-          {/* info resumida */}
-          <div className="grid grid-cols-2 gap-3">
-
-            {/* forma de pagamento */}
-            <div className="bg-muted/40 rounded-xl p-3">
+          {/* Grid de info */}
+          <div id="tour-info-pagamento" className="grid grid-cols-2 gap-3">
+            <div id="tour-forma-detalhe" className="bg-muted/40 rounded-xl p-3">
               <p className="text-xs text-muted-foreground font-body mb-1">Forma de pagamento</p>
               {editandoPagto ? (
                 <select
@@ -123,8 +359,7 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
               )}
             </div>
 
-            {/* status */}
-            <div className="bg-muted/40 rounded-xl p-3">
+            <div id="tour-status-detalhe" className="bg-muted/40 rounded-xl p-3">
               <p className="text-xs text-muted-foreground font-body mb-1">Status</p>
               {editandoPagto ? (
                 <select
@@ -144,30 +379,34 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
 
             <div className="bg-muted/40 rounded-xl p-3">
               <p className="text-xs text-muted-foreground font-body mb-1">Responsável</p>
-              <p className="text-sm font-medium font-body">
-                {venda?.usuarioResponsavel?.nome || '—'}
-              </p>
+              <p className="text-sm font-medium font-body">{venda?.usuarioResponsavel?.nome || '—'}</p>
             </div>
+
             <div className="bg-muted/40 rounded-xl p-3">
               <p className="text-xs text-muted-foreground font-body mb-1">Total</p>
-              <p className="text-sm font-bold text-primary font-sans">
-                {formatCurrency(venda?.valorTotal ?? venda?.total)}
+              <p id="tour-total-detalhe" className="text-sm font-bold text-primary font-sans">
+                {formatCurrency(valorTotal)}
               </p>
             </div>
           </div>
 
-          {/* botões edição de pagamento */}
+          {/* Botão atualizar / salvar */}
           {!editandoPagto ? (
             <button
+              id="tour-atualizar-pagamento"
               onClick={() => setEditandoPagto(true)}
               className="w-full border border-border rounded-lg py-2 text-xs font-body text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center gap-1.5"
             >
               <CheckCircle2 size={13} /> Atualizar pagamento
             </button>
           ) : (
-            <div className="flex gap-2">
+            <div id="tour-atualizar-pagamento" className="flex gap-2">
               <button
-                onClick={() => { setEditandoPagto(false); setFormaPagto(venda?.formaPagto || ''); setStatusPagto(venda?.statusPagto || 'pendente') }}
+                onClick={() => {
+                  setEditandoPagto(false)
+                  setFormaPagto(venda?.formaPagto || '')
+                  setStatusPagto(venda?.statusPagto || 'pendente')
+                }}
                 className="flex-1 border border-border rounded-lg py-2 text-xs font-body text-muted-foreground hover:bg-muted transition-colors"
               >
                 Cancelar
@@ -177,33 +416,29 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
                 disabled={loadingSalvar || !pagamentoAlterado}
                 className="flex-1 bg-primary text-primary-foreground rounded-lg py-2 text-xs font-body hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
-                {loadingSalvar
-                  ? <Loader2 size={12} className="animate-spin" />
-                  : <CheckCircle2 size={12} />
-                }
+                {loadingSalvar ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                 Salvar
               </button>
             </div>
           )}
 
+          {/* Observação */}
           {venda?.observacao && (
-            <div className="bg-muted/30 border border-border rounded-xl px-4 py-3">
+            <div id="tour-observacao-detalhe" className="bg-muted/30 border border-border rounded-xl px-4 py-3">
               <p className="text-xs text-muted-foreground font-body mb-0.5">Observação</p>
               <p className="text-sm font-body">{venda.observacao}</p>
             </div>
           )}
 
-          {/* itens */}
-          <div>
+          {/* Itens */}
+          <div id="tour-itens-venda">
             <p className="text-sm font-medium font-body mb-2">Itens da venda</p>
             {loadingItens ? (
               <div className="flex justify-center py-6">
                 <Loader2 size={20} className="animate-spin text-primary" />
               </div>
             ) : itens.length === 0 ? (
-              <p className="text-sm text-muted-foreground font-body text-center py-4">
-                Nenhum item encontrado.
-              </p>
+              <p className="text-sm text-muted-foreground font-body text-center py-4">Nenhum item encontrado.</p>
             ) : (
               <div className="border border-border rounded-xl overflow-hidden">
                 <table className="w-full text-sm font-body">
@@ -220,8 +455,8 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
                       const nome = item?.nome || item?.produto?.nome || item?.servico?.nome || '—'
                       const tipo = item?.tipo
                       const unit = Number(item?.precoUnit ?? item?.preco_unit ?? 0)
-                      const sub  = Number(item?.subtotal ?? 0)
-                      const qtd  = Number(item?.quantidade ?? 1)
+                      const sub = Number(item?.subtotal ?? 0)
+                      const qtd = Number(item?.quantidade ?? 1)
                       return (
                         <tr key={item?.id || idx} className="border-t border-border">
                           <td className="px-3 py-2">
@@ -244,7 +479,6 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
           </div>
         </div>
 
-        {/* footer */}
         <div className="px-6 pb-6 pt-4 border-t border-border">
           <button
             onClick={onClose}
@@ -254,11 +488,24 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
           </button>
         </div>
       </div>
+
+      {tourAtivo && (
+        <TourTooltip
+          steps={stepsValidos}
+          index={tourIndex}
+          onNext={() => {
+            if (tourIndex === stepsValidos.length - 1) setTourAtivo(false)
+            else setTourIndex(tourIndex + 1)
+          }}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
+      )}
     </div>
   )
 }
 
-// ─── Modal: Nova Venda ───────────────────────────────────────────────────────
+// ─── MODAL NOVA VENDA ─────────────────────────────────────────────────────────
 
 function NovaVendaModal({ onClose, onSalvo }) {
   const [produtos, setProdutos] = useState([])
@@ -269,6 +516,67 @@ function NovaVendaModal({ onClose, onSalvo }) {
   const [statusPagto, setStatusPagto] = useState('pendente')
   const [observacao, setObservacao] = useState('')
   const [loading, setLoading] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const novaVendaSteps = [
+    {
+      selector: '#tour-nova-header',
+      title: 'Registrar nova venda',
+      body: 'Este formulário permite criar uma nova venda do zero. Você pode adicionar produtos do estoque e serviços prestados, informar como o cliente pagou e salvar tudo de uma vez.',
+      tip: 'Você pode adicionar quantos produtos e serviços quiser na mesma venda.',
+    },
+    {
+      selector: '#tour-forma-pagamento',
+      title: 'Forma de pagamento',
+      body: 'Selecione como o cliente vai pagar: Dinheiro (espécie), Cartão (crédito ou débito) ou PIX (transferência instantânea). Este campo é obrigatório.',
+      tip: 'Você pode mudar a forma de pagamento depois, na tela de detalhes da venda.',
+    },
+    {
+      selector: '#tour-status-pagamento',
+      title: 'Status do pagamento',
+      body: 'Define a situação atual do pagamento. Use "Pendente" se ainda não recebeu, "Pago" se já foi quitado, "Cancelado" se a venda não foi realizada, ou "Estornado" se devolveu o dinheiro.',
+      tip: 'O padrão é "Pendente". Altere para "Pago" quando o pagamento for confirmado.',
+    },
+    {
+      selector: '#tour-agendamento',
+      title: 'Vincular a um agendamento',
+      body: 'Campo opcional. Se esta venda está relacionada a um atendimento já agendado (como um procedimento estético ou consulta), informe o ID do agendamento aqui para manter o histórico do cliente organizado.',
+    },
+    {
+      selector: '#tour-observacao-nova',
+      title: 'Observação',
+      body: 'Campo de texto livre para anotações internas. Exemplos: "venda avulsa sem agendamento", "cliente pediu nota fiscal", "pacote de 5 sessões". Não aparece para o cliente.',
+    },
+    {
+      selector: '#tour-produtos',
+      title: 'Adicionar produtos',
+      body: 'Clique em qualquer produto para adicioná-lo à venda. O botão mostra o nome, preço unitário e quantidade disponível em estoque. Produtos sem estoque ficam desabilitados.',
+      tip: 'Clique no mesmo produto várias vezes para aumentar a quantidade, ou ajuste direto na tabela de itens.',
+    },
+    {
+      selector: '#tour-servicos',
+      title: 'Adicionar serviços',
+      body: 'Aqui ficam os serviços disponíveis para venda (ex: corte, coloração, massagem). Não possuem controle de estoque, então você pode adicionar quantas vezes quiser.',
+    },
+    {
+      selector: '#tour-tabela-itens',
+      title: 'Itens selecionados',
+      body: 'Lista em tempo real dos produtos e serviços adicionados à venda. Você pode ajustar a quantidade de cada item ou remover um item clicando no ícone de lixeira.',
+      tip: 'O total é recalculado automaticamente sempre que você altera uma quantidade.',
+    },
+    {
+      selector: '#tour-total-nova',
+      title: 'Total da venda',
+      body: 'Soma automática de todos os itens. Este é o valor que será registrado no sistema como total da venda.',
+    },
+    {
+      selector: '#tour-registrar-venda',
+      title: 'Registrar venda',
+      body: 'Ao clicar aqui, a venda é salva no sistema com todos os itens, forma de pagamento e status. O estoque dos produtos é atualizado automaticamente.',
+      tip: 'Verifique se todos os itens e o valor total estão corretos antes de confirmar.',
+    },
+  ]
 
   useEffect(() => {
     async function load() {
@@ -341,13 +649,7 @@ function NovaVendaModal({ onClose, onSalvo }) {
         formaPagto,
         statusPagto,
         observacao: observacao || undefined,
-        itens: itens.map(i => ({
-          tipo: i.tipo,
-          id: i.id,
-          nome: i.nome,
-          quantidade: i.quantidade,
-          preco: i.preco,
-        })),
+        itens: itens.map(i => ({ tipo: i.tipo, id: i.id, nome: i.nome, quantidade: i.quantidade, preco: i.preco })),
         total: subtotal,
       })
       toast.success('Venda registrada com sucesso!')
@@ -364,18 +666,29 @@ function NovaVendaModal({ onClose, onSalvo }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
       <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl animate-fade-in max-h-[90vh] flex flex-col">
 
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
+        {/* Header */}
+        <div id="tour-nova-header" className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
           <h3 className="font-sans text-lg font-bold text-card-foreground">Nova Venda</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setTourIndex(0); setTourAtivo(true) }}
+              className="text-muted-foreground hover:text-primary transition-colors"
+              aria-label="Ajuda"
+            >
+              <HelpCircle size={17} />
+            </button>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-4">
           <form id="venda-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
 
+            {/* Pagamento */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div id="tour-forma-pagamento">
                 <label className="block text-sm font-medium font-body mb-1.5">
                   Forma de pagamento <span className="text-destructive">*</span>
                 </label>
@@ -391,10 +704,9 @@ function NovaVendaModal({ onClose, onSalvo }) {
                   <option value="pix">PIX</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium font-body mb-1.5">
-                  Status do pagamento
-                </label>
+
+              <div id="tour-status-pagamento">
+                <label className="block text-sm font-medium font-body mb-1.5">Status do pagamento</label>
                 <select
                   value={statusPagto}
                   onChange={e => setStatusPagto(e.target.value)}
@@ -408,11 +720,10 @@ function NovaVendaModal({ onClose, onSalvo }) {
               </div>
             </div>
 
+            {/* Agendamento + Observação */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium font-body mb-1.5">
-                  ID do Agendamento (opcional)
-                </label>
+              <div id="tour-agendamento">
+                <label className="block text-sm font-medium font-body mb-1.5">ID do Agendamento (opcional)</label>
                 <input
                   type="text"
                   value={agendamentoId}
@@ -421,10 +732,9 @@ function NovaVendaModal({ onClose, onSalvo }) {
                   className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium font-body mb-1.5">
-                  Observação (opcional)
-                </label>
+
+              <div id="tour-observacao-nova">
+                <label className="block text-sm font-medium font-body mb-1.5">Observação (opcional)</label>
                 <input
                   type="text"
                   value={observacao}
@@ -435,8 +745,9 @@ function NovaVendaModal({ onClose, onSalvo }) {
               </div>
             </div>
 
+            {/* Produtos */}
             {produtos.length > 0 && (
-              <div>
+              <div id="tour-produtos">
                 <p className="text-sm font-medium font-body mb-2 flex items-center gap-1">
                   <Package size={13} /> Produtos
                 </p>
@@ -458,8 +769,9 @@ function NovaVendaModal({ onClose, onSalvo }) {
               </div>
             )}
 
+            {/* Serviços */}
             {servicos.length > 0 && (
-              <div>
+              <div id="tour-servicos">
                 <p className="text-sm font-medium font-body mb-2 flex items-center gap-1">
                   <Scissors size={13} /> Serviços
                 </p>
@@ -478,8 +790,9 @@ function NovaVendaModal({ onClose, onSalvo }) {
               </div>
             )}
 
+            {/* Tabela de itens */}
             {itens.length > 0 && (
-              <div>
+              <div id="tour-tabela-itens">
                 <p className="text-sm font-medium font-body mb-2">Itens da venda</p>
                 <div className="border border-border rounded-xl overflow-hidden">
                   <table className="w-full text-sm font-body">
@@ -524,7 +837,8 @@ function NovaVendaModal({ onClose, onSalvo }) {
                     </tbody>
                   </table>
                 </div>
-                <div className="flex justify-end mt-2">
+
+                <div id="tour-total-nova" className="flex justify-end mt-2">
                   <span className="text-sm font-body">
                     Total:{' '}
                     <strong className="text-primary font-sans text-base">
@@ -545,6 +859,7 @@ function NovaVendaModal({ onClose, onSalvo }) {
             Cancelar
           </button>
           <button
+            id="tour-registrar-venda"
             form="venda-form"
             type="submit"
             disabled={loading}
@@ -555,17 +870,85 @@ function NovaVendaModal({ onClose, onSalvo }) {
           </button>
         </div>
       </div>
+
+      {tourAtivo && (
+        <TourTooltip
+          steps={novaVendaSteps}
+          index={tourIndex}
+          onNext={() => {
+            if (tourIndex === novaVendaSteps.length - 1) setTourAtivo(false)
+            else setTourIndex(tourIndex + 1)
+          }}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
+      )}
     </div>
   )
 }
 
-// ─── Página principal ────────────────────────────────────────────────────────
+// ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 
 export default function VendasPage() {
   const [vendas, setVendas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [vendaSelecionada, setVendaSelecionada] = useState(null)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const vendasSteps = [
+    {
+      selector: '#tour-page-header',
+      title: 'Módulo de Vendas',
+      body: 'Bem-vindo ao módulo de Vendas! Aqui você registra todas as vendas realizadas (produtos e serviços), acompanha pagamentos e mantém o histórico financeiro atualizado.',
+      tip: 'Acesse esta página sempre que fechar uma venda com um cliente.',
+    },
+    {
+      selector: '#btn-nova-venda',
+      title: 'Registrar nova venda',
+      body: 'Clique aqui para abrir o formulário de nova venda. Você poderá adicionar produtos do estoque, serviços prestados, definir a forma de pagamento e o status.',
+      tip: 'Atalho rápido: abra este modal logo após concluir um atendimento para não esquecer de registrar.',
+    },
+    {
+      selector: '#tabela-vendas',
+      title: 'Lista de vendas',
+      body: 'Aqui ficam todas as vendas já registradas. Cada linha mostra: data da venda, quem registrou (responsável), quantidade de itens, forma de pagamento, status e valor total.',
+      tip: 'Clique em qualquer linha para ver os detalhes completos e editar o pagamento.',
+    },
+    {
+      selector: '#col-data',
+      title: 'Coluna: Data',
+      body: 'Data em que a venda foi registrada no sistema, no formato dd/mm/aaaa.',
+    },
+    {
+      selector: '#col-responsavel',
+      title: 'Coluna: Responsável',
+      body: 'Nome do usuário que criou a venda. Útil para identificar qual colaborador realizou o atendimento.',
+    },
+    {
+      selector: '#col-pagamento',
+      title: 'Coluna: Pagamento',
+      body: 'Forma de pagamento usada: Dinheiro, Cartão ou PIX. Representada por ícone e texto para facilitar a leitura rápida.',
+    },
+    {
+      selector: '#col-status',
+      title: 'Coluna: Status',
+      body: 'Situação atual do pagamento. Cores ajudam a identificar: amarelo = Pendente, verde = Pago, vermelho = Cancelado, cinza = Estornado.',
+      tip: 'Filtre mentalmente as vendas amarelas — são as que precisam de atenção!',
+    },
+    {
+      selector: '#col-total',
+      title: 'Coluna: Total',
+      body: 'Valor total da venda em reais. Inclui todos os produtos e serviços somados.',
+    },
+    {
+      selector: '#primeira-venda',
+      title: 'Abrindo os detalhes',
+      body: 'Clique em qualquer linha da tabela para abrir o painel de detalhes dessa venda. Lá você verá os itens vendidos, poderá atualizar o pagamento e conferir o histórico completo.',
+      tip: 'O ícone de olho (👁) no final de cada linha indica que a venda é clicável.',
+    },
+  ]
 
   async function fetchVendas() {
     setLoading(true)
@@ -583,21 +966,32 @@ export default function VendasPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      {/* Header */}
+      <div id="tour-page-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">Vendas</h1>
-          <p className="text-muted-foreground font-body mt-1 text-sm">
-            Registre e acompanhe as vendas
-          </p>
+          <p className="text-muted-foreground font-body mt-1 text-sm">Registre e acompanhe as vendas</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-body hover:opacity-90 transition-opacity"
-        >
-          <Plus size={16} /> Nova venda
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setTourIndex(0); setTourAtivo(true) }}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2.5 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <HelpCircle size={16} /> Ajuda
+          </button>
+
+          <button
+            id="btn-nova-venda"
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-body hover:opacity-90 transition-opacity"
+          >
+            <Plus size={16} /> Nova venda
+          </button>
+        </div>
       </div>
 
+      {/* Tabela */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={32} className="animate-spin text-primary" />
@@ -608,23 +1002,24 @@ export default function VendasPage() {
           <p className="text-muted-foreground font-body">Nenhuma venda registrada ainda.</p>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div id="tabela-vendas" className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm font-body">
               <thead className="bg-muted/50">
                 <tr className="text-xs text-muted-foreground uppercase tracking-wide text-left">
-                  <th className="px-4 py-3 font-medium">Data</th>
-                  <th className="px-4 py-3 font-medium">Responsável</th>
+                  <th id="col-data" className="px-4 py-3 font-medium">Data</th>
+                  <th id="col-responsavel" className="px-4 py-3 font-medium">Responsável</th>
                   <th className="px-4 py-3 font-medium">Itens</th>
-                  <th className="px-4 py-3 font-medium">Pagamento</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Total</th>
+                  <th id="col-pagamento" className="px-4 py-3 font-medium">Pagamento</th>
+                  <th id="col-status" className="px-4 py-3 font-medium">Status</th>
+                  <th id="col-total" className="px-4 py-3 font-medium text-right">Total</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {vendas.map((v, i) => (
                   <tr
+                    id={i === 0 ? 'primeira-venda' : undefined}
                     key={v?.id || i}
                     className="border-t border-border hover:bg-muted/30 cursor-pointer"
                     onClick={() => setVendaSelecionada(v)}
@@ -634,18 +1029,10 @@ export default function VendasPage() {
                         ? new Date(v.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
                         : formatDate(v?.createdAt)}
                     </td>
-                    <td className="px-4 py-3">
-                      {v?.usuarioResponsavel?.nome || 'Administrador'}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {v?.itens?.length ?? '—'} item(s)
-                    </td>
-                    <td className="px-4 py-3">
-                      <FormaBadge forma={v?.formaPagto} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={v?.statusPagto} />
-                    </td>
+                    <td className="px-4 py-3">{v?.usuarioResponsavel?.nome || 'Administrador'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{v?.itens?.length ?? '—'} item(s)</td>
+                    <td className="px-4 py-3"><FormaBadge forma={v?.formaPagto} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={v?.statusPagto} /></td>
                     <td className="px-4 py-3 text-right font-medium text-primary">
                       {formatCurrency(v?.valorTotal ?? v?.total)}
                     </td>
@@ -660,11 +1047,9 @@ export default function VendasPage() {
         </div>
       )}
 
+      {/* Modais */}
       {showModal && (
-        <NovaVendaModal
-          onClose={() => setShowModal(false)}
-          onSalvo={fetchVendas}
-        />
+        <NovaVendaModal onClose={() => setShowModal(false)} onSalvo={fetchVendas} />
       )}
 
       {vendaSelecionada && (
@@ -672,6 +1057,20 @@ export default function VendasPage() {
           venda={vendaSelecionada}
           onClose={() => setVendaSelecionada(null)}
           onAtualizado={fetchVendas}
+        />
+      )}
+
+      {/* Tour da página principal */}
+      {tourAtivo && (
+        <TourTooltip
+          steps={vendasSteps}
+          index={tourIndex}
+          onNext={() => {
+            if (tourIndex === vendasSteps.length - 1) setTourAtivo(false)
+            else setTourIndex(tourIndex + 1)
+          }}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
         />
       )}
     </div>
