@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Loader2, MessageCircle, Send, X, AlertCircle } from 'lucide-react'
+import { Loader2, MessageCircle, Send, X, AlertCircle, RefreshCw, CheckCircle2, Wifi, WifiOff } from 'lucide-react'
 import apiClient from '@/utils/apiClient'
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
 function normalizarTelefoneBR(tel) {
   if (!tel) return null
@@ -13,22 +15,87 @@ function normalizarTelefoneBR(tel) {
   return null
 }
 
-function formatarData(dateStr) {
-  if (!dateStr) return ''
-  const s = String(dateStr)
-  const parte = s.includes('T') ? s.split('T')[0] : s
-  const [y, m, d] = parte.split('-')
-  return `${d}/${m}/${y}`
-}
-
 function formatarHora(timeStr) {
   if (!timeStr) return ''
   return String(timeStr).slice(0, 5)
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms))
+// ─── Sub-componente: painel de status / QR Code ───────────────────────────────
+
+function StatusWhatsApp({ statusWpp, qrImage, onVerificar, verificando }) {
+  if (!statusWpp || statusWpp === 'pronto') return null
+
+  return (
+    <div className="border border-yellow-200 rounded-xl overflow-hidden">
+      {/* Cabeçalho */}
+      <div className="bg-yellow-50 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <WifiOff size={14} className="text-yellow-700 shrink-0" />
+          <span className="text-xs text-yellow-800 font-body font-medium">
+            {statusWpp === 'qr_pendente'
+              ? 'WhatsApp não conectado — escaneie o QR Code para continuar.'
+              : 'WhatsApp desconectado — aguardando reconexão automática.'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onVerificar}
+          disabled={verificando}
+          className="flex items-center gap-1 text-xs text-yellow-700 hover:text-yellow-900 font-body disabled:opacity-50"
+        >
+          {verificando
+            ? <Loader2 size={12} className="animate-spin" />
+            : <RefreshCw size={12} />
+          }
+          Atualizar
+        </button>
+      </div>
+
+      {/* QR Code */}
+      {statusWpp === 'qr_pendente' && qrImage && (
+        <div className="bg-white flex flex-col items-center gap-3 py-5 px-4">
+          <div className="border-2 border-yellow-200 rounded-xl p-2 shadow-sm">
+            <img
+              src={qrImage}
+              alt="QR Code WhatsApp"
+              className="w-44 h-44 rounded-lg"
+            />
+          </div>
+          <div className="text-center space-y-1 max-w-xs">
+            <p className="text-xs font-body font-medium text-foreground">Como escanear:</p>
+            <p className="text-xs text-muted-foreground font-body leading-relaxed">
+              Abra o WhatsApp no celular → toque em <strong>⋮</strong> ou <strong>Configurações</strong>
+              {' '}→ <strong>Dispositivos conectados</strong> → <strong>Conectar dispositivo</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onVerificar}
+            disabled={verificando}
+            className="flex items-center gap-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 text-xs font-body font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+          >
+            {verificando
+              ? <><Loader2 size={12} className="animate-spin" /> Verificando...</>
+              : <><CheckCircle2 size={12} /> Já escaniei, verificar conexão</>
+            }
+          </button>
+        </div>
+      )}
+
+      {/* Aguardando reconexão automática */}
+      {statusWpp === 'aguardando' && (
+        <div className="bg-white flex items-center justify-center gap-2 py-4">
+          <Loader2 size={14} className="animate-spin text-yellow-600" />
+          <span className="text-xs text-muted-foreground font-body">
+            Reconectando ao WhatsApp...
+          </span>
+        </div>
+      )}
+    </div>
+  )
 }
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function DisparoEmMassa() {
   const hoje = new Date().toISOString().slice(0, 10)
@@ -41,6 +108,44 @@ export default function DisparoEmMassa() {
   const [progresso, setProgresso] = useState({ atual: 0, total: 0 })
   const [erros, setErros] = useState([])
   const [concluido, setConcluido] = useState(false)
+  const [statusWpp, setStatusWpp] = useState(null)
+  const [qrImage, setQrImage] = useState(null)
+  const [verificando, setVerificando] = useState(false)
+
+  const verificarStatus = useCallback(async (silencioso = false) => {
+    if (!silencioso) setVerificando(true)
+    try {
+      const r = await apiClient.get('/disparos/status')
+      const payload = r?.data ?? r
+      const novoEstado = payload?.estado
+
+      // Avisa quando conectar após QR
+      if (novoEstado === 'pronto' && statusWpp === 'qr_pendente') {
+        toast.success('WhatsApp conectado com sucesso!')
+      }
+
+      setStatusWpp(novoEstado)
+      setQrImage(payload?.qr || null)
+    } catch {
+      setStatusWpp(null)
+      setQrImage(null)
+    } finally {
+      if (!silencioso) setVerificando(false)
+    }
+  }, [statusWpp])
+
+  // Checa status ao abrir o painel
+  useEffect(() => {
+    if (!aberto) return
+    verificarStatus()
+  }, [aberto])
+
+  // Polling a cada 5s enquanto aguarda QR ser escaneado
+  useEffect(() => {
+    if (!aberto || statusWpp === 'pronto' || statusWpp === null) return
+    const intervalo = setInterval(() => verificarStatus(true), 5000)
+    return () => clearInterval(intervalo)
+  }, [aberto, statusWpp, verificarStatus])
 
   async function buscarDestinatarios() {
     setCarregando(true)
@@ -58,8 +163,8 @@ export default function DisparoEmMassa() {
     } catch (err) {
       toast.error(
         err?.response?.data?.msg ||
-        err?.response?.data?.error ||
-        'Erro ao buscar destinatários.'
+          err?.response?.data?.error ||
+          'Erro ao buscar destinatários.'
       )
     } finally {
       setCarregando(false)
@@ -76,44 +181,29 @@ export default function DisparoEmMassa() {
     setDisparando(true)
     setConcluido(false)
     setProgresso({ atual: 0, total: destinatarios.length })
-    const novosErros = []
 
-    for (let i = 0; i < destinatarios.length; i++) {
-      const d = destinatarios[i]
-      const tel = normalizarTelefoneBR(d.telefone)
+    try {
+      const res = await apiClient.post('/disparos/executar', { destinatarios })
+      const payload = res?.data ?? res
+      const { enviados, erros: novosErros } = payload
 
-      if (!tel) {
-        novosErros.push({ nome: d.nome_cliente, motivo: 'Telefone inválido' })
-        setProgresso({ atual: i + 1, total: destinatarios.length })
-        continue
+      setErros(novosErros || [])
+      setProgresso({ atual: destinatarios.length, total: destinatarios.length })
+      setConcluido(true)
+
+      if (!novosErros?.length) {
+        toast.success(`Disparo concluído! ${enviados} mensagem(ns) enviada(s).`)
+      } else {
+        toast.warning(`Concluído com ${novosErros.length} erro(s).`)
       }
-
-      const msg = encodeURIComponent(
-        `Olá, ${d.nome_cliente}! Passando para lembrar do seu agendamento de ${d.servico} no dia ${formatarData(d.data)} às ${formatarHora(d.hora_inicio)}.`
-      )
-      window.open(`https://wa.me/${tel}?text=${msg}`, '_blank')
-
-      try {
-        await apiClient.post('/disparos/registrar', {
-          agendamento_id: d.agendamento_id,
-          user_id: d.user_id,
-          telefone: tel,
-          status: 'enviado',
-        })
-      } catch { /* log não bloqueia o fluxo */ }
-
-      setProgresso({ atual: i + 1, total: destinatarios.length })
-      await sleep(1200)
-    }
-
-    setErros(novosErros)
-    setDisparando(false)
-    setConcluido(true)
-
-    if (!novosErros.length) {
-      toast.success(`Disparo concluído! ${destinatarios.length} mensagem(ns) enviada(s).`)
-    } else {
-      toast.warning(`Disparo concluído com ${novosErros.length} erro(s).`)
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'Erro ao disparar mensagens.'
+      toast.error(msg)
+      if (err?.response?.status === 503) {
+        verificarStatus() // busca QR atualizado
+      }
+    } finally {
+      setDisparando(false)
     }
   }
 
@@ -167,6 +257,11 @@ export default function DisparoEmMassa() {
           <span className="font-sans font-semibold text-sm text-foreground">
             Disparo em Massa — Lembretes WhatsApp
           </span>
+          {statusWpp === 'pronto' && (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-body">
+              <Wifi size={12} /> Conectado
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -178,33 +273,43 @@ export default function DisparoEmMassa() {
         </button>
       </div>
 
-      {/* Filtro de data + busca */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-xs font-body text-muted-foreground mb-1">Data</label>
-          <input
-            type="date"
-            value={dataSelecionada}
-            onChange={(e) => {
-              setDataSelecionada(e.target.value)
-              setDestinatarios([])
-              setConcluido(false)
-            }}
-            className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
-          />
+      {/* Painel de status / QR Code */}
+      <StatusWhatsApp
+        statusWpp={statusWpp}
+        qrImage={qrImage}
+        onVerificar={verificarStatus}
+        verificando={verificando}
+      />
+
+      {/* Filtros e busca — só exibe quando conectado */}
+      {(statusWpp === 'pronto' || statusWpp === null) && (
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs font-body text-muted-foreground mb-1">Data</label>
+            <input
+              type="date"
+              value={dataSelecionada}
+              onChange={(e) => {
+                setDataSelecionada(e.target.value)
+                setDestinatarios([])
+                setConcluido(false)
+              }}
+              className="border border-input rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={buscarDestinatarios}
+            disabled={carregando || disparando}
+            className="flex items-center gap-1.5 border border-input bg-background hover:bg-muted text-foreground text-sm font-body px-4 py-2 rounded-lg disabled:opacity-50 transition"
+          >
+            {carregando
+              ? <><Loader2 size={14} className="animate-spin" /> Buscando...</>
+              : 'Buscar destinatários'
+            }
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={buscarDestinatarios}
-          disabled={carregando || disparando}
-          className="flex items-center gap-1.5 border border-input bg-background hover:bg-muted text-foreground text-sm font-body px-4 py-2 rounded-lg disabled:opacity-50 transition"
-        >
-          {carregando
-            ? <><Loader2 size={14} className="animate-spin" /> Buscando...</>
-            : 'Buscar destinatários'
-          }
-        </button>
-      </div>
+      )}
 
       {/* Tabela de preview */}
       {destinatarios.length > 0 && (
