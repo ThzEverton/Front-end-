@@ -13,8 +13,6 @@ const STATUS_CONFIG = {
   estornado: { label: 'Estornado', cls: 'bg-gray-100 text-gray-500' },
 }
 
-
-// formaPagto vem em minúsculo do repo
 const FORMA_CONFIG = {
   dinheiro: 'bg-green-100 text-green-700',
   cartao:   'bg-blue-100 text-blue-700',
@@ -66,19 +64,18 @@ export default function FinanceiroPage() {
     }
   }
 
-  // troca a função handleExportCSV
-function handleExportCSV() {
-  const pagos = registros.filter((r) => r?.status === 'pago')
-  if (pagos.length === 0) return
+  function handleExportCSV() {
+    const pagos = registros.filter((r) => r?.status === 'pago')
+    if (pagos.length === 0) return
 
-  abrirRelatorio({
-    registros:   pagos,
-    titulo:      'Relatório de Recebimentos',
-    eyebrow:     'Sala Rosa · Financeiro',
-    accentColor: '#d4537e',
-    nomeArquivo: 'financeiro_sala_rosa.csv',
-  })
-}
+    abrirRelatorio({
+      registros:   pagos,
+      titulo:      'Relatório de Recebimentos',
+      eyebrow:     'Sala Rosa · Financeiro',
+      accentColor: '#d4537e',
+      nomeArquivo: 'financeiro_sala_rosa.csv',
+    })
+  }
 
   const temFiltro = filtroStatus || filtroInicio || filtroFim
 
@@ -195,7 +192,7 @@ function handleExportCSV() {
         )}
       </div>
 
-      {/* Tabela */}
+      {/* Lista */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={32} className="animate-spin text-primary" />
@@ -206,72 +203,142 @@ function handleExportCSV() {
           <p className="text-muted-foreground font-body">Nenhum registro financeiro encontrado.</p>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm font-body">
-              <thead className="bg-muted/50">
-                <tr className="text-xs text-muted-foreground uppercase tracking-wide text-left">
-                  <th className="px-4 py-3 font-medium">Data</th>
-                  <th className="px-4 py-3 font-medium">Descrição</th>
-                  <th className="px-4 py-3 font-medium">Tipo</th>
-                  <th className="px-4 py-3 font-medium">Forma</th>
-                  <th className="px-4 py-3 font-medium text-right">Valor</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {registros.map((r, i) => {
-                  const statusCfg = STATUS_CONFIG[r?.status] ?? { label: r?.status, cls: 'bg-muted text-muted-foreground' }
-                  const formaCls  = FORMA_CONFIG[r?.formaPagto?.toLowerCase()] ?? 'bg-muted text-muted-foreground'
+        <>
+          {/* ════════════════════════════════════════════════════════════
+              VERSÃO MOBILE — visível apenas em telas menores que sm (< 640px)
+              Cada registro financeiro é exibido como um card individual.
+              A tabela fica escondida nesse breakpoint (hidden → sm:block).
+          ════════════════════════════════════════════════════════════ */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {registros.map((r, i) => {
+              const statusCfg = STATUS_CONFIG[r?.status] ?? { label: r?.status, cls: 'bg-muted text-muted-foreground' }
+              const formaCls  = FORMA_CONFIG[r?.formaPagto?.toLowerCase()] ?? 'bg-muted text-muted-foreground'
 
-                  return (
-                    <tr key={r?.id || i} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {formatDate(r?.dataRef)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {r?.descricao || '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-body">
-                          RECEITA
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {r?.formaPagto ? (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-body ${formaCls}`}>
-                            {r.formaPagto}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-primary whitespace-nowrap">
-                        {formatCurrency(r?.valor)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-body ${statusCfg.cls}`}>
-                          {statusCfg.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {r?.status === 'pendente' && (
-                          <button
-                            onClick={() => marcarPago(r.id)}
-                            className="text-xs text-primary hover:underline font-body"
-                          >
-                            Marcar pago
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+              return (
+                <div key={r?.id || i} className="bg-card border border-border rounded-xl p-4">
+                  {/* Linha superior: descrição + valor */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <p className="font-body text-sm font-medium text-foreground leading-snug flex-1 min-w-0">
+                      {r?.descricao || '-'}
+                    </p>
+                    <span className="font-sans font-bold text-primary text-sm whitespace-nowrap shrink-0">
+                      {formatCurrency(r?.valor)}
+                    </span>
+                  </div>
+
+                  {/* Linha do meio: data + forma + tipo */}
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-xs text-muted-foreground font-body">
+                      {formatDate(r?.dataRef)}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-body">
+                      RECEITA
+                    </span>
+                    {r?.formaPagto && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-body ${formaCls}`}>
+                        {r.formaPagto}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Linha inferior: status + ação */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-body ${statusCfg.cls}`}>
+                      {statusCfg.label}
+                    </span>
+                    {r?.status === 'pendente' && (
+                      <button
+                        onClick={() => marcarPago(r.id)}
+                        className="text-xs text-primary border border-primary/30 rounded-lg px-3 py-1.5 font-body hover:bg-primary/5 transition-colors"
+                      >
+                        Marcar pago
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        </div>
+          {/* ════════════════════════════════════════════════════════════
+              FIM VERSÃO MOBILE
+          ════════════════════════════════════════════════════════════ */}
+
+
+          {/* ════════════════════════════════════════════════════════════
+              VERSÃO DESKTOP — visível apenas em telas sm+ (≥ 640px)
+              Exibe os registros como uma tabela tradicional com colunas.
+              Os cards ficam escondidos nesse breakpoint (sm:hidden → block).
+          ════════════════════════════════════════════════════════════ */}
+          <div className="hidden sm:block bg-card border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm font-body">
+                <thead className="bg-muted/50">
+                  <tr className="text-xs text-muted-foreground uppercase tracking-wide text-left">
+                    <th className="px-4 py-3 font-medium">Data</th>
+                    <th className="px-4 py-3 font-medium">Descrição</th>
+                    <th className="px-4 py-3 font-medium">Tipo</th>
+                    <th className="px-4 py-3 font-medium">Forma</th>
+                    <th className="px-4 py-3 font-medium text-right">Valor</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registros.map((r, i) => {
+                    const statusCfg = STATUS_CONFIG[r?.status] ?? { label: r?.status, cls: 'bg-muted text-muted-foreground' }
+                    const formaCls  = FORMA_CONFIG[r?.formaPagto?.toLowerCase()] ?? 'bg-muted text-muted-foreground'
+
+                    return (
+                      <tr key={r?.id || i} className="border-t border-border hover:bg-muted/30">
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                          {formatDate(r?.dataRef)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {r?.descricao || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-body">
+                            RECEITA
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {r?.formaPagto ? (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-body ${formaCls}`}>
+                              {r.formaPagto}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-primary whitespace-nowrap">
+                          {formatCurrency(r?.valor)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-body ${statusCfg.cls}`}>
+                            {statusCfg.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {r?.status === 'pendente' && (
+                            <button
+                              onClick={() => marcarPago(r.id)}
+                              className="text-xs text-primary hover:underline font-body"
+                            >
+                              Marcar pago
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {/* ════════════════════════════════════════════════════════════
+              FIM VERSÃO DESKTOP
+          ════════════════════════════════════════════════════════════ */}
+        </>
       )}
     </div>
   )
