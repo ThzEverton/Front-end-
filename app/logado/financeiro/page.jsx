@@ -65,17 +65,16 @@ export default function FinanceiroPage() {
   }
 
   function handleExportCSV() {
-    const pagos = registros.filter((r) => r?.status === 'pago')
-    if (pagos.length === 0) return
-
-    abrirRelatorio({
-      registros:   pagos,
-      titulo:      'Relatório de Recebimentos',
-      eyebrow:     'Sala Rosa · Financeiro',
-      accentColor: '#d4537e',
-      nomeArquivo: 'financeiro_sala_rosa.csv',
-    })
-  }
+  const pagos = registros.filter((r) => r?.status === 'pago')
+  if (pagos.length === 0) return
+  abrirRelatorio({
+    registros:   pagos,
+    titulo:      'Relatório de Recebimentos',
+    eyebrow:     'Sala Rosa · Financeiro',
+    accentColor: '#d4537e',
+    nomeArquivo: 'financeiro_sala_rosa.csv',
+  })
+}
 
   const temFiltro = filtroStatus || filtroInicio || filtroFim
 
