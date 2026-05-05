@@ -109,6 +109,50 @@ const FORMA_CORES = {
 }
 const getCores = (f) => FORMA_CORES[f] || FORMA_CORES._default
 
+
+function RelatorioUsuarios({ registros }) {
+  const total = registros.length
+  const consultoras = registros.filter(r => r.tipo === 'consultora').length
+  const clientes = registros.filter(r => r.tipo === 'cliente').length
+  const ativos = registros.filter(r => r.status === 'ativo').length
+
+  return (
+    <div>
+      <h1>Relatório de Usuários</h1>
+
+      <div>
+        <p>Total: {total}</p>
+        <p>Consultoras: {consultoras}</p>
+        <p>Clientes: {clientes}</p>
+        <p>Ativos: {ativos}</p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>Perfil</th>
+            <th>Tipo</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {registros.map((u, i) => (
+            <tr key={i}>
+              <td>{u.descricao}</td>
+              <td>{u.email}</td>
+              <td>{u.perfil}</td>
+              <td>{u.tipo}</td>
+              <td>{u.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ─── Componente do relatório ──────────────────────────────────────────────────
 
 function RelatorioFinanceiro({

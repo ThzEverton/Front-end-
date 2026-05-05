@@ -80,7 +80,85 @@ function statusStyle(status) {
 }
 
 // ─── Componente do relatório ──────────────────────────────────────────────────
+function RelatorioUsuarios({ registros = [], titulo = 'Relatório de Usuários', accentColor = '#7F77DD' }) {
+  const total = registros.length
+  const consultoras = registros.filter((r) => r.tipo === 'consultora').length
+  const clientes = registros.filter((r) => r.tipo === 'cliente').length
+  const ativos = registros.filter((r) => r.status === 'ativo').length
+  const inativos = registros.filter((r) => r.status === 'inativo').length
 
+  return (
+    <div style={r.page}>
+      <div style={r.header}>
+        <div>
+          <div style={{ ...r.eyebrow, color: accentColor }}>Cadastros · Usuários</div>
+          <h1 style={r.titulo}>{titulo}</h1>
+          <p style={r.subtitulo}>
+            {new Date().toLocaleDateString('pt-BR', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </p>
+        </div>
+      </div>
+
+      <div style={{ ...r.metricsGrid, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <MetCard label="Usuários" value={total} cor={accentColor} icon={<Users size={18} color={accentColor} />} />
+        <MetCard label="Clientes" value={clientes} icon={<Users size={18} color="#5F5E5A" />} />
+        <MetCard label="Consultoras" value={consultoras} icon={<Users size={18} color="#534AB7" />} />
+        <MetCard label="Inativos" value={inativos} icon={<ToggleLeft size={18} color="#5F5E5A" />} />
+      </div>
+
+      <div style={r.section}>
+        <p style={r.secLabel}>Usuários cadastrados</p>
+
+        <div style={r.tableWrap}>
+          <table style={r.table}>
+            <thead>
+              <tr style={{ background: accentColor + '15' }}>
+                {['Nome', 'E-mail', 'Perfil', 'Tipo', 'Status'].map((col) => (
+                  <th key={col} style={{ ...r.th, color: accentColor }}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {registros.map((u, i) => (
+                <tr key={i} style={r.tr}>
+                  <td style={{ ...r.td, fontWeight: 500 }}>{u.descricao || '-'}</td>
+                  <td style={r.td}>{u.email || '-'}</td>
+                  <td style={{ ...r.td, textTransform: 'capitalize' }}>{u.perfil || '-'}</td>
+                  <td style={r.td}>
+                    <span style={{ ...r.badge, ...getCores(u.tipo), marginBottom: 0 }}>
+                      {u.tipo === 'consultora' ? 'Consultora' : 'Cliente'}
+                    </span>
+                  </td>
+                  <td style={r.td}>
+                    <span style={{ ...r.statusBadge, ...statusStyle(u.status) }}>
+                      {u.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+            <tfoot>
+              <tr>
+                <td colSpan={5} style={{ ...r.td, ...r.tfootLabel }}>
+                  Total de usuários: {total} · Ativos: {ativos} · Inativos: {inativos}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div style={r.rodape}>Gerado automaticamente · {new Date().getFullYear()}</div>
+    </div>
+  )
+}
 function RelatorioFinanceiro({
   registros     = [],
   titulo        = 'Relatório',
@@ -225,19 +303,31 @@ function RelatorioFinanceiro({
 
 function RelatorioModal({ config, onClose }) {
   if (!config) return null
+
   return (
     <div
       style={st.overlay}
+      className="relatorio-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div style={st.modal}>
-        <button style={st.btnFechar} onClick={onClose} aria-label="Fechar">
+      <div style={st.modal} className="relatorio-modal-print">
+        <button
+          style={st.btnFechar}
+          className="no-print"
+          onClick={onClose}
+          aria-label="Fechar"
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M4 4l8 8M12 4l-8 8" />
           </svg>
         </button>
-        <div style={st.scrollArea}>
-          <RelatorioFinanceiro {...config} />
+
+        <div style={st.scrollArea} className="relatorio-scroll-print">
+          {config.tipoRelatorio === 'usuarios' ? (
+            <RelatorioUsuarios {...config} />
+          ) : (
+            <RelatorioFinanceiro {...config} />
+          )}
         </div>
       </div>
     </div>
@@ -379,25 +469,23 @@ function UsuariosTab() {
   })
 
   function handleRelatorio() {
-    const registros = usuariosFiltrados.map((u) => ({
-      dataRef:   u.createdAt || null,
-      descricao: u.nome,
-      tipo:      u.perfil || 'cliente',
-      formaPagto: u.isConsultora || u.is_consultora ? 'consultora' : 'cliente',
-      valor:     0,
-      status:    u.ativo !== false && u.ativo !== 0 ? 'ativo' : 'inativo',
-    }))
+  const registros = usuariosFiltrados.map((u) => ({
+    dataRef: u.createdAt || null,
+    descricao: u.nome,
+    perfil: u.perfil || 'cliente',
+    tipo: u.isConsultora || u.is_consultora ? 'consultora' : 'cliente',
+    status: u.ativo !== false && u.ativo !== 0 ? 'ativo' : 'inativo',
+    email: u.email,
+  }))
 
-    setRelatorioConfig({
-      registros,
-      titulo:      'Relatório de Usuários',
-      eyebrow:     'Cadastros · Usuários',
-      accentColor: '#7F77DD',
-      tipo:        'TODOS',
-      statusFiltro: null,
-      nomeArquivo: 'usuarios.csv',
-    })
-  }
+  setRelatorioConfig({
+    tipoRelatorio: 'usuarios',
+    registros,
+    titulo: 'Relatório de Usuários',
+    accentColor: '#7F77DD',
+    nomeArquivo: 'usuarios.csv',
+  })
+}
 
   return (
     <div>
