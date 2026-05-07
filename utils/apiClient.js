@@ -68,7 +68,7 @@ async function request(method, endpoint, body) {
 
     if (!response.ok) {
       const message =
-        (typeof data === 'object' && (data?.message || data?.error)) ||
+        (typeof data === 'object' && (data?.msg || data?.message || data?.error)) ||
         `Erro ${response.status}`
       throw new Error(message)
     }
