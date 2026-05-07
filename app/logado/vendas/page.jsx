@@ -332,8 +332,11 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
 function NovaVendaModal({ onClose, onSalvo }) {
   const [produtos, setProdutos] = useState([])
   const [servicos, setServicos] = useState([])
+  const [clientes, setClientes] = useState([])
   const [itens, setItens] = useState([])
+  const [vinculoTipo, setVinculoTipo] = useState('nenhum')
   const [agendamentoId, setAgendamentoId] = useState('')
+  const [clienteId, setClienteId] = useState('')
   const [formaPagto, setFormaPagto] = useState('')
   const [statusPagto, setStatusPagto] = useState('pendente')
   const [observacao, setObservacao] = useState('')
@@ -345,7 +348,7 @@ function NovaVendaModal({ onClose, onSalvo }) {
     { selector: '#tour-nova-header', title: 'Registrar nova venda', body: 'Este formulário permite criar uma nova venda do zero. Você pode adicionar produtos do estoque e serviços prestados, informar como o cliente pagou e salvar tudo de uma vez.', tip: 'Você pode adicionar quantos produtos e serviços quiser na mesma venda.' },
     { selector: '#tour-forma-pagamento', title: 'Forma de pagamento', body: 'Selecione como o cliente vai pagar: Dinheiro (espécie), Cartão (crédito ou débito) ou PIX (transferência instantânea). Este campo é obrigatório.', tip: 'Você pode mudar a forma de pagamento depois, na tela de detalhes da venda.' },
     { selector: '#tour-status-pagamento', title: 'Status do pagamento', body: 'Define a situação atual do pagamento. Use "Pendente" se ainda não recebeu, "Pago" se já foi quitado, "Cancelado" se a venda não foi realizada, ou "Estornado" se devolveu o dinheiro.', tip: 'O padrão é "Pendente". Altere para "Pago" quando o pagamento for confirmado.' },
-    { selector: '#tour-agendamento', title: 'Vincular a um agendamento', body: 'Campo opcional. Se esta venda está relacionada a um atendimento já agendado, informe o ID do agendamento aqui para manter o histórico do cliente organizado.' },
+    { selector: '#tour-vinculo', title: 'Vincular venda', body: 'Campo opcional. A venda pode ficar avulsa, ser vinculada a um atendimento pelo ID, ou ser vinculada diretamente a uma cliente.' },
     { selector: '#tour-observacao-nova', title: 'Observação', body: 'Campo de texto livre para anotações internas. Exemplos: "venda avulsa sem agendamento", "cliente pediu nota fiscal", "pacote de 5 sessões". Não aparece para o cliente.' },
     { selector: '#tour-produtos', title: 'Adicionar produtos', body: 'Clique em qualquer produto para adicioná-lo à venda. O botão mostra o nome, preço unitário e quantidade disponível em estoque. Produtos sem estoque ficam desabilitados.', tip: 'Clique no mesmo produto várias vezes para aumentar a quantidade, ou ajuste direto na tabela de itens.' },
     { selector: '#tour-servicos', title: 'Adicionar serviços', body: 'Aqui ficam os serviços disponíveis para venda (ex: corte, coloração, massagem). Não possuem controle de estoque, então você pode adicionar quantas vezes quiser.' },
@@ -357,11 +360,17 @@ function NovaVendaModal({ onClose, onSalvo }) {
   useEffect(() => {
     async function load() {
       try {
-        const [p, s] = await Promise.all([apiClient.get('/produtos'), apiClient.get('/servicos')])
+        const [p, s, u] = await Promise.all([apiClient.get('/produtos'), apiClient.get('/servicos'), apiClient.get('/users')])
         const prods = (Array.isArray(p) ? p : p?.produtos || []).map(prod => ({ ...prod, preco: Number(prod.precoVenda ?? prod.preco_venda ?? prod.preco ?? prod.valor ?? 0), estoqueAtual: Number(prod.estoqueAtual ?? prod.estoque_atual ?? 0) }))
         const servs = (Array.isArray(s) ? s : s?.servicos || []).map(serv => ({ ...serv, preco: Number(serv.preco ?? serv.valor ?? 0) }))
+        const users = Array.isArray(u) ? u : u?.users || []
         setProdutos(prods)
         setServicos(servs)
+        setClientes(users.filter(user => {
+          const ativo = user.ativo !== false && user.ativo !== 0
+          const cliente = (user.perfil || 'cliente') === 'cliente'
+          return ativo && cliente
+        }))
       } catch {}
     }
     load()
@@ -397,14 +406,28 @@ function NovaVendaModal({ onClose, onSalvo }) {
     e.preventDefault()
     if (itens.length === 0) { toast.error('Adicione pelo menos um item à venda.'); return }
     if (!formaPagto) { toast.error('Selecione a forma de pagamento.'); return }
+    if (vinculoTipo === 'agendamento' && !agendamentoId.trim()) { toast.error('Informe o ID do atendimento.'); return }
+    if (vinculoTipo === 'cliente' && !clienteId) { toast.error('Selecione uma cliente.'); return }
+
+    const payload = {
+      formaPagto,
+      statusPagto,
+      observacao: observacao || undefined,
+      itens: itens.map(i => ({ tipo: i.tipo, id: i.id, nome: i.nome, quantidade: i.quantidade, preco: i.preco })),
+      total: subtotal,
+    }
+
+    if (vinculoTipo === 'agendamento') payload.agendamentoId = agendamentoId.trim()
+    if (vinculoTipo === 'cliente') payload.clienteId = Number(clienteId)
+
     setLoading(true)
     try {
-      await apiClient.post('/vendas', { agendamentoId: agendamentoId || undefined, formaPagto, statusPagto, observacao: observacao || undefined, itens: itens.map(i => ({ tipo: i.tipo, id: i.id, nome: i.nome, quantidade: i.quantidade, preco: i.preco })), total: subtotal })
+      await apiClient.post('/vendas', payload)
       toast.success('Venda registrada com sucesso!')
       onSalvo()
       onClose()
     } catch (err) {
-      toast.error(err?.response?.data?.msg || 'Erro ao registrar venda.')
+      toast.error(err?.response?.data?.msg || err?.message || 'Erro ao registrar venda.')
     } finally {
       setLoading(false)
     }
@@ -444,9 +467,34 @@ function NovaVendaModal({ onClose, onSalvo }) {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div id="tour-agendamento">
-                <label className="block text-sm font-medium font-body mb-1.5">ID do Agendamento (opcional)</label>
-                <input type="text" value={agendamentoId} onChange={e => setAgendamentoId(e.target.value)} placeholder="Vincular a um atendimento" className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
+              <div id="tour-vinculo">
+                <label className="block text-sm font-medium font-body mb-1.5">Vincular venda (opcional)</label>
+                <select
+                  value={vinculoTipo}
+                  onChange={e => {
+                    setVinculoTipo(e.target.value)
+                    setAgendamentoId('')
+                    setClienteId('')
+                  }}
+                  className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body mb-2"
+                >
+                  <option value="nenhum">Sem vínculo</option>
+                  <option value="agendamento">Atendimento</option>
+                  <option value="cliente">Cliente</option>
+                </select>
+
+                {vinculoTipo === 'agendamento' && (
+                  <input type="text" value={agendamentoId} onChange={e => setAgendamentoId(e.target.value)} placeholder="ID do atendimento" className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
+                )}
+
+                {vinculoTipo === 'cliente' && (
+                  <select value={clienteId} onChange={e => setClienteId(e.target.value)} className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body">
+                    <option value="">Selecione uma cliente...</option>
+                    {clientes.map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div id="tour-observacao-nova">
                 <label className="block text-sm font-medium font-body mb-1.5">Observação (opcional)</label>
