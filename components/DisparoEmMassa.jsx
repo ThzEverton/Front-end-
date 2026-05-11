@@ -35,7 +35,7 @@ function StatusWhatsApp({
   if (!statusWpp || statusWpp === 'pronto') return null
 
   const conectadoParcial = statusWpp === 'qr_pendente' || statusWpp === 'aguardando'
-  const podeConectar = statusWpp === 'desativado' || statusWpp === 'erro'
+  const podeConectar = statusWpp === 'desconectado' || statusWpp === 'desativado' || statusWpp === 'erro'
 
   return (
     <div className="border border-yellow-200 rounded-xl overflow-hidden">
@@ -119,7 +119,7 @@ function StatusWhatsApp({
         </div>
       )}
 
-      {(statusWpp === 'desativado' || statusWpp === 'erro') && (
+      {(['desconectado', 'desativado', 'erro'].includes(statusWpp)) && (
         <div className="bg-white flex items-center justify-center gap-2 py-4">
           <WifiOff size={14} className="text-yellow-600" />
           <span className="text-xs text-muted-foreground font-body">Conexao parada.</span>
@@ -190,7 +190,7 @@ export default function DisparoEmMassa() {
       setQrImage(payload?.qr || null)
       toast.success('Conexao do WhatsApp iniciada.')
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Erro ao conectar WhatsApp.')
+      toast.error(err?.data?.error || err?.message || 'Erro ao conectar WhatsApp.')
     } finally {
       setConectando(false)
     }
@@ -205,7 +205,7 @@ export default function DisparoEmMassa() {
     try {
       const response = await apiClient.post('/disparos/desconectar')
       const payload = response?.data ?? response
-      setStatusWpp(payload?.estado || 'aguardando')
+      setStatusWpp(payload?.estado || 'desconectado')
       setQrImage(null)
       setDestinatarios([])
       setErros([])
@@ -213,7 +213,7 @@ export default function DisparoEmMassa() {
       setProgresso({ atual: 0, total: 0 })
       toast.success('Sessao do WhatsApp encerrada.')
     } catch (err) {
-      toast.error(err?.response?.data?.error || err?.message || 'Erro ao sair da sessao do WhatsApp.')
+      toast.error(err?.data?.error || err?.message || 'Erro ao sair da sessao do WhatsApp.')
     } finally {
       setDesconectando(false)
     }
@@ -234,8 +234,9 @@ export default function DisparoEmMassa() {
         toast.info('Nenhum destinatário encontrado para esta data.')
     } catch (err) {
       toast.error(
-        err?.response?.data?.msg ||
-          err?.response?.data?.error ||
+        err?.data?.msg ||
+          err?.data?.error ||
+          err?.message ||
           'Erro ao buscar destinatários.'
       )
     } finally {
@@ -269,9 +270,9 @@ export default function DisparoEmMassa() {
         toast.warning(`Concluído com ${novosErros.length} erro(s).`)
       }
     } catch (err) {
-      const msg = err?.response?.data?.error || 'Erro ao disparar mensagens.'
+      const msg = err?.data?.error || err?.message || 'Erro ao disparar mensagens.'
       toast.error(msg)
-      if (err?.response?.status === 503) {
+      if (err?.status === 503) {
         verificarStatus() // busca QR atualizado
       }
     } finally {
