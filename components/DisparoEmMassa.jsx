@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Loader2, MessageCircle, Send, X, AlertCircle, RefreshCw, CheckCircle2, Wifi, WifiOff } from 'lucide-react'
+import { Loader2, MessageCircle, Send, X, AlertCircle, RefreshCw, CheckCircle2, Wifi, WifiOff, LogOut } from 'lucide-react'
 import apiClient from '@/utils/apiClient'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -111,6 +111,7 @@ export default function DisparoEmMassa() {
   const [statusWpp, setStatusWpp] = useState(null)
   const [qrImage, setQrImage] = useState(null)
   const [verificando, setVerificando] = useState(false)
+  const [desconectando, setDesconectando] = useState(false)
 
   const verificarStatus = useCallback(async (silencioso = false) => {
     if (!silencioso) setVerificando(true)
@@ -207,6 +208,31 @@ export default function DisparoEmMassa() {
     }
   }
 
+  async function desconectarWhatsApp() {
+    if (disparando || desconectando) return
+    const ok = window.confirm('Sair da sessao do WhatsApp neste sistema?')
+    if (!ok) return
+
+    setDesconectando(true)
+    try {
+      const response = await apiClient.post('/disparos/desconectar')
+      const payload = response?.data ?? response
+
+      setStatusWpp(payload?.estado || 'aguardando')
+      setQrImage(payload?.qr || null)
+      setDestinatarios([])
+      setErros([])
+      setConcluido(false)
+      setProgresso({ atual: 0, total: 0 })
+      toast.success('Sessao do WhatsApp encerrada.')
+      verificarStatus(true)
+    } catch (err) {
+      toast.error(err?.message || 'Erro ao sair da sessao do WhatsApp.')
+    } finally {
+      setDesconectando(false)
+    }
+  }
+
   function fechar() {
     if (disparando) return
     setAberto(false)
@@ -251,7 +277,7 @@ export default function DisparoEmMassa() {
     <div className="bg-card border border-primary/30 rounded-xl p-5 mb-6 space-y-4">
 
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MessageCircle size={16} className="text-primary" />
           <span className="font-sans font-semibold text-sm text-foreground">
@@ -263,14 +289,31 @@ export default function DisparoEmMassa() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={fechar}
-          disabled={disparando}
-          className="text-muted-foreground hover:text-foreground disabled:opacity-40"
-        >
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          {statusWpp === 'pronto' && (
+            <button
+              type="button"
+              onClick={desconectarWhatsApp}
+              disabled={disparando || desconectando}
+              title="Sair da sessao do WhatsApp"
+              className="flex items-center gap-1.5 border border-input bg-background hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-body px-3 py-1.5 rounded-lg disabled:opacity-40 transition"
+            >
+              {desconectando
+                ? <Loader2 size={13} className="animate-spin" />
+                : <LogOut size={13} />
+              }
+              Sair do WhatsApp
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={fechar}
+            disabled={disparando}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Painel de status / QR Code */}
