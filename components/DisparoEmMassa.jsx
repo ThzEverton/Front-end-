@@ -22,50 +22,80 @@ function formatarHora(timeStr) {
 
 // ─── Sub-componente: painel de status / QR Code ───────────────────────────────
 
-function StatusWhatsApp({ statusWpp, qrImage, onVerificar, verificando }) {
+function StatusWhatsApp({
+  statusWpp,
+  qrImage,
+  onVerificar,
+  verificando,
+  onConectar,
+  onDesconectar,
+  conectando,
+  desconectando,
+}) {
   if (!statusWpp || statusWpp === 'pronto') return null
+
+  const conectadoParcial = statusWpp === 'qr_pendente' || statusWpp === 'aguardando'
+  const podeConectar = statusWpp === 'desativado' || statusWpp === 'erro'
 
   return (
     <div className="border border-yellow-200 rounded-xl overflow-hidden">
-      {/* Cabeçalho */}
-      <div className="bg-yellow-50 px-4 py-3 flex items-center justify-between">
+      <div className="bg-yellow-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <WifiOff size={14} className="text-yellow-700 shrink-0" />
           <span className="text-xs text-yellow-800 font-body font-medium">
             {statusWpp === 'qr_pendente'
-              ? 'WhatsApp não conectado — escaneie o QR Code para continuar.'
-              : 'WhatsApp desconectado — aguardando reconexão automática.'}
+              ? 'WhatsApp nao conectado. Escaneie o QR Code para continuar.'
+              : statusWpp === 'aguardando'
+                ? 'WhatsApp conectando. Se a rede bloquear, voce pode parar a tentativa.'
+                : statusWpp === 'erro'
+                  ? 'WhatsApp com erro de conexao. Tente conectar novamente.'
+                  : 'WhatsApp desconectado. Conecte quando quiser enviar lembretes.'}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onVerificar}
-          disabled={verificando}
-          className="flex items-center gap-1 text-xs text-yellow-700 hover:text-yellow-900 font-body disabled:opacity-50"
-        >
-          {verificando
-            ? <Loader2 size={12} className="animate-spin" />
-            : <RefreshCw size={12} />
-          }
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {podeConectar && (
+            <button
+              type="button"
+              onClick={onConectar}
+              disabled={conectando}
+              className="flex items-center gap-1 text-xs text-yellow-800 hover:text-yellow-950 font-body font-medium disabled:opacity-50"
+            >
+              {conectando ? <Loader2 size={12} className="animate-spin" /> : <Wifi size={12} />}
+              Conectar
+            </button>
+          )}
+          {conectadoParcial && (
+            <button
+              type="button"
+              onClick={onDesconectar}
+              disabled={desconectando}
+              className="flex items-center gap-1 text-xs text-yellow-800 hover:text-yellow-950 font-body font-medium disabled:opacity-50"
+            >
+              {desconectando ? <Loader2 size={12} className="animate-spin" /> : <WifiOff size={12} />}
+              Sair
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onVerificar}
+            disabled={verificando}
+            className="flex items-center gap-1 text-xs text-yellow-700 hover:text-yellow-900 font-body disabled:opacity-50"
+          >
+            {verificando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            Atualizar
+          </button>
+        </div>
       </div>
 
-      {/* QR Code */}
       {statusWpp === 'qr_pendente' && qrImage && (
         <div className="bg-white flex flex-col items-center gap-3 py-5 px-4">
           <div className="border-2 border-yellow-200 rounded-xl p-2 shadow-sm">
-            <img
-              src={qrImage}
-              alt="QR Code WhatsApp"
-              className="w-44 h-44 rounded-lg"
-            />
+            <img src={qrImage} alt="QR Code WhatsApp" className="w-44 h-44 rounded-lg" />
           </div>
           <div className="text-center space-y-1 max-w-xs">
             <p className="text-xs font-body font-medium text-foreground">Como escanear:</p>
             <p className="text-xs text-muted-foreground font-body leading-relaxed">
-              Abra o WhatsApp no celular → toque em <strong>⋮</strong> ou <strong>Configurações</strong>
-              {' '}→ <strong>Dispositivos conectados</strong> → <strong>Conectar dispositivo</strong>
+              Abra o WhatsApp no celular, entre em Dispositivos conectados e escolha Conectar dispositivo.
             </p>
           </div>
           <button
@@ -76,26 +106,28 @@ function StatusWhatsApp({ statusWpp, qrImage, onVerificar, verificando }) {
           >
             {verificando
               ? <><Loader2 size={12} className="animate-spin" /> Verificando...</>
-              : <><CheckCircle2 size={12} /> Já escaniei, verificar conexão</>
+              : <><CheckCircle2 size={12} /> Ja escaneei, verificar conexao</>
             }
           </button>
         </div>
       )}
 
-      {/* Aguardando reconexão automática */}
       {statusWpp === 'aguardando' && (
         <div className="bg-white flex items-center justify-center gap-2 py-4">
           <Loader2 size={14} className="animate-spin text-yellow-600" />
-          <span className="text-xs text-muted-foreground font-body">
-            Reconectando ao WhatsApp...
-          </span>
+          <span className="text-xs text-muted-foreground font-body">Conectando ao WhatsApp...</span>
+        </div>
+      )}
+
+      {(statusWpp === 'desativado' || statusWpp === 'erro') && (
+        <div className="bg-white flex items-center justify-center gap-2 py-4">
+          <WifiOff size={14} className="text-yellow-600" />
+          <span className="text-xs text-muted-foreground font-body">Conexao parada.</span>
         </div>
       )}
     </div>
   )
 }
-
-// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function DisparoEmMassa() {
   const hoje = new Date().toISOString().slice(0, 10)
@@ -111,6 +143,7 @@ export default function DisparoEmMassa() {
   const [statusWpp, setStatusWpp] = useState(null)
   const [qrImage, setQrImage] = useState(null)
   const [verificando, setVerificando] = useState(false)
+  const [conectando, setConectando] = useState(false)
   const [desconectando, setDesconectando] = useState(false)
 
   const verificarStatus = useCallback(async (silencioso = false) => {
@@ -141,12 +174,50 @@ export default function DisparoEmMassa() {
     verificarStatus()
   }, [aberto])
 
-  // Polling a cada 5s enquanto aguarda QR ser escaneado
+  // Polling a cada 5s apenas enquanto existe uma tentativa ativa.
   useEffect(() => {
-    if (!aberto || statusWpp === 'pronto' || statusWpp === null) return
+    if (!aberto || !['qr_pendente', 'aguardando'].includes(statusWpp)) return
     const intervalo = setInterval(() => verificarStatus(true), 5000)
     return () => clearInterval(intervalo)
   }, [aberto, statusWpp, verificarStatus])
+
+  async function conectarWhatsApp() {
+    setConectando(true)
+    try {
+      const response = await apiClient.post('/disparos/conectar')
+      const payload = response?.data ?? response
+      setStatusWpp(payload?.estado)
+      setQrImage(payload?.qr || null)
+      toast.success('Conexao do WhatsApp iniciada.')
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Erro ao conectar WhatsApp.')
+    } finally {
+      setConectando(false)
+    }
+  }
+
+  async function desconectarWhatsApp() {
+    if (disparando || desconectando) return
+    const ok = window.confirm('Sair da sessao do WhatsApp neste sistema?')
+    if (!ok) return
+
+    setDesconectando(true)
+    try {
+      const response = await apiClient.post('/disparos/desconectar')
+      const payload = response?.data ?? response
+      setStatusWpp(payload?.estado || 'aguardando')
+      setQrImage(null)
+      setDestinatarios([])
+      setErros([])
+      setConcluido(false)
+      setProgresso({ atual: 0, total: 0 })
+      toast.success('Sessao do WhatsApp encerrada.')
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || 'Erro ao sair da sessao do WhatsApp.')
+    } finally {
+      setDesconectando(false)
+    }
+  }
 
   async function buscarDestinatarios() {
     setCarregando(true)
@@ -205,31 +276,6 @@ export default function DisparoEmMassa() {
       }
     } finally {
       setDisparando(false)
-    }
-  }
-
-  async function desconectarWhatsApp() {
-    if (disparando || desconectando) return
-    const ok = window.confirm('Sair da sessao do WhatsApp neste sistema?')
-    if (!ok) return
-
-    setDesconectando(true)
-    try {
-      const response = await apiClient.post('/disparos/desconectar')
-      const payload = response?.data ?? response
-
-      setStatusWpp(payload?.estado || 'aguardando')
-      setQrImage(payload?.qr || null)
-      setDestinatarios([])
-      setErros([])
-      setConcluido(false)
-      setProgresso({ atual: 0, total: 0 })
-      toast.success('Sessao do WhatsApp encerrada.')
-      verificarStatus(true)
-    } catch (err) {
-      toast.error(err?.message || 'Erro ao sair da sessao do WhatsApp.')
-    } finally {
-      setDesconectando(false)
     }
   }
 
@@ -322,6 +368,10 @@ export default function DisparoEmMassa() {
         qrImage={qrImage}
         onVerificar={verificarStatus}
         verificando={verificando}
+        onConectar={conectarWhatsApp}
+        onDesconectar={desconectarWhatsApp}
+        conectando={conectando}
+        desconectando={desconectando}
       />
 
       {/* Filtros e busca — só exibe quando conectado */}

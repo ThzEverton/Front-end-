@@ -42,6 +42,9 @@ function normalizarStatus(status) {
     concluido: 'CONCLUIDO',
     cancelado: 'CANCELADO',
     remarcado: 'REMARCADO',
+    aprovado: 'APROVADO',
+    recusado: 'RECUSADO',
+    pendente_aprovacao: 'PENDENTE_APROVACAO',
   }
   return map[s] || String(status || '').toUpperCase()
 }
@@ -53,6 +56,9 @@ function statusParaApi(status) {
     CONCLUIDO: 'concluido',
     CANCELADO: 'cancelado',
     REMARCADO: 'remarcado',
+    APROVADO: 'aprovado',
+    RECUSADO: 'recusado',
+    PENDENTE_APROVACAO: 'pendente_aprovacao',
   }
   return map[status] || status
 }
@@ -158,6 +164,9 @@ function statusBadge(status) {
     CONCLUIDO: 'bg-green-100 text-green-700',
     CANCELADO: 'bg-destructive/10 text-destructive',
     REMARCADO: 'bg-yellow-100 text-yellow-700',
+    APROVADO: 'bg-green-100 text-green-700',
+    RECUSADO: 'bg-destructive/10 text-destructive',
+    PENDENTE_APROVACAO: 'bg-yellow-100 text-yellow-700',
   }
   return `text-xs px-2 py-0.5 rounded-full font-body ${map[status] || 'bg-muted text-muted-foreground'}`
 }
@@ -172,9 +181,6 @@ function erroApi(error, fallback) {
 }
 
 // ─── TourTooltip ──────────────────────────────────────────────────────────────
-//
-// Tooltip do tour que se ancora no elemento via getBoundingClientRect.
-// Usa position: fixed para funcionar dentro de modais (escapa do stacking context).
 
 const TOOLTIP_W = 272
 const TOUR_GAP = 14
@@ -196,12 +202,10 @@ function TourTooltip({ step, index, total, onNext, onPrev, onStop }) {
       const tipH = tooltipRef.current?.offsetHeight || 150
       const vp = { w: window.innerWidth, h: window.innerHeight }
 
-      // Vertical: prefere abaixo, sobe se não couber
       let top = rect.bottom + TOUR_GAP
       if (top + tipH > vp.h - TOUR_MARGIN) top = rect.top - tipH - TOUR_GAP
       if (top < TOUR_MARGIN) top = TOUR_MARGIN
 
-      // Horizontal: alinha com esquerda do elemento, clamp para não sair da tela
       let left = rect.left
       if (left + TOOLTIP_W > vp.w - TOUR_MARGIN) left = vp.w - TOOLTIP_W - TOUR_MARGIN
       if (left < TOUR_MARGIN) left = TOUR_MARGIN
@@ -221,118 +225,113 @@ function TourTooltip({ step, index, total, onNext, onPrev, onStop }) {
   const { targetRect } = pos
 
   return (
-  <>
-    {/* Overlay escurecido com furo destacando o elemento alvo */}
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}
-      aria-hidden="true"
-    >
-      <svg width="100%" height="100%">
-        <defs>
-          <mask id="tour-highlight-mask">
-            <rect width="100%" height="100%" fill="white" />
-            <rect
-              x={targetRect.left - 20}
-              y={targetRect.top - 20}
-              width={targetRect.width + 40}
-              height={targetRect.height + 40}
-              rx="10"
-              fill="black"
-            />
-          </mask>
-        </defs>
-        <rect
-          width="100%"
-          height="100%"
-          fill="rgba(0,0,0,0.48)"
-          mask="url(#tour-highlight-mask)"
-        />
-        <rect
-          x={targetRect.left - 20}
-          y={targetRect.top - 20}
-          width={targetRect.width + 40}
-          height={targetRect.height + 40}
-          rx="10"
-          fill="none"
-          stroke="rgba(255,255,255,0.7)"
-          strokeWidth="2"
-        />
-      </svg>
-    </div>
-
-    {/* Card do tooltip */}
-    <div
-      ref={tooltipRef}
-      role="dialog"
-      aria-modal="false"
-      aria-label={step.title}
-      style={{
-        position: 'fixed',
-        top: pos.top,
-        left: pos.left,
-        zIndex: 9999,
-        width: 'min(90vw, 320px)',       // ✅ largura responsiva
-        maxWidth: 'calc(100vw - 24px)',  // ✅ evita estourar tela
-      }}
-      className="bg-card border border-border rounded-2xl shadow-2xl p-4 animate-fade-in"
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="font-sans font-bold text-sm text-card-foreground leading-snug">
-          {step.title}
-        </p>
-        <button
-          onClick={onStop}
-          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
-          aria-label="Fechar tour"
-        >
-          <X size={14} />
-        </button>
+    <>
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}
+        aria-hidden="true"
+      >
+        <svg width="100%" height="100%">
+          <defs>
+            <mask id="tour-highlight-mask">
+              <rect width="100%" height="100%" fill="white" />
+              <rect
+                x={targetRect.left - 20}
+                y={targetRect.top - 20}
+                width={targetRect.width + 40}
+                height={targetRect.height + 40}
+                rx="10"
+                fill="black"
+              />
+            </mask>
+          </defs>
+          <rect
+            width="100%"
+            height="100%"
+            fill="rgba(0,0,0,0.48)"
+            mask="url(#tour-highlight-mask)"
+          />
+          <rect
+            x={targetRect.left - 20}
+            y={targetRect.top - 20}
+            width={targetRect.width + 40}
+            height={targetRect.height + 40}
+            rx="10"
+            fill="none"
+            stroke="rgba(255,255,255,0.7)"
+            strokeWidth="2"
+          />
+        </svg>
       </div>
 
-      <p className="text-xs text-muted-foreground font-body mb-4 leading-relaxed">
-        {step.body}
-      </p>
-
-      {/* 🔥 RODAPÉ CORRIGIDO */}
-      <div className="flex flex-col gap-3">
-        {/* Indicadores */}
-        <div className="flex items-center gap-1 overflow-hidden">
-          {Array.from({ length: total }).map((_, i) => (
-            <span
-              key={i}
-              className={`inline-block rounded-full transition-all shrink-0 ${
-                i === index ? 'w-4 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-border'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Botões */}
-        <div className="flex justify-end gap-2">
-          {index > 0 && (
-            <button
-              onClick={onPrev}
-              className="flex items-center gap-1 text-xs border border-border px-2.5 py-1.5 rounded-lg font-body hover:bg-muted transition-colors whitespace-nowrap"
-            >
-              <ChevronLeft size={12} /> Anterior
-            </button>
-          )}
-
+      <div
+        ref={tooltipRef}
+        role="dialog"
+        aria-modal="false"
+        aria-label={step.title}
+        style={{
+          position: 'fixed',
+          top: pos.top,
+          left: pos.left,
+          zIndex: 9999,
+          width: 'min(90vw, 320px)',
+          maxWidth: 'calc(100vw - 24px)',
+        }}
+        className="bg-card border border-border rounded-2xl shadow-2xl p-4 animate-fade-in"
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="font-sans font-bold text-sm text-card-foreground leading-snug">
+            {step.title}
+          </p>
           <button
-            onClick={onNext}
-            className="flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2.5 py-1.5 rounded-lg font-body hover:opacity-90 transition-opacity whitespace-nowrap"
+            onClick={onStop}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+            aria-label="Fechar tour"
           >
-            {isLast ? (
-              <><Check size={12} /> Entendi!</>
-            ) : (
-              <>Próximo <ChevronRight size={12} /></>
-            )}
+            <X size={14} />
           </button>
         </div>
+
+        <p className="text-xs text-muted-foreground font-body mb-4 leading-relaxed">
+          {step.body}
+        </p>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-1 overflow-hidden">
+            {Array.from({ length: total }).map((_, i) => (
+              <span
+                key={i}
+                className={`inline-block rounded-full transition-all shrink-0 ${
+                  i === index ? 'w-4 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-border'
+                }`}
+              />
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            {index > 0 && (
+              <button
+                onClick={onPrev}
+                className="flex items-center gap-1 text-xs border border-border px-2.5 py-1.5 rounded-lg font-body hover:bg-muted transition-colors whitespace-nowrap"
+              >
+                <ChevronLeft size={12} /> Anterior
+              </button>
+            )}
+
+            <button
+              onClick={onNext}
+              className="flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2.5 py-1.5 rounded-lg font-body hover:opacity-90 transition-opacity whitespace-nowrap"
+            >
+              {isLast ? (
+                <><Check size={12} /> Entendi!</>
+              ) : (
+                <>Próximo <ChevronRight size={12} /></>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
-  </>
-)
+    </>
+  )
 }
 
 // ─── useTour ──────────────────────────────────────────────────────────────────
@@ -344,7 +343,6 @@ function buildSteps(isGerente) {
       title: '📋 Bem-vindo aos Agendamentos',
       body: 'Aqui você acompanha todos os agendamentos. Vamos conhecer cada parte da página!',
     },
-    // Slots do dia — só gerente vê esse bloco
     ...(isGerente ? [
       {
         id: 'tour-ag-slots',
@@ -373,7 +371,6 @@ function buildSteps(isGerente) {
       body: 'Cada linha é um agendamento. Clique em "Detalhes" para ver informações completas, remarcar ou cancelar.',
       onLeave: 'openDetalheModal',
     },
-    // Passos dentro do modal de detalhes
     {
       id: 'tour-ag-modal-info',
       title: '👤 Informações do agendamento',
@@ -572,7 +569,6 @@ function DetalheModal({ agendamento, isGerente, isTour = false, onClose, onRemar
           </button>
         </div>
 
-        {/* Informações — id para o tour apontar */}
         <div id="tour-ag-modal-info" className="grid grid-cols-2 gap-3 text-sm font-body mb-4">
           <div>
             <span className="text-muted-foreground text-xs uppercase tracking-wide block mb-0.5">Cliente</span>
@@ -600,7 +596,6 @@ function DetalheModal({ agendamento, isGerente, isTour = false, onClose, onRemar
           </div>
         </div>
 
-        {/* WhatsApp — id para o tour (gerente) */}
         {isGerente && (
           <div id="tour-ag-modal-whatsapp">
             <button
@@ -621,7 +616,6 @@ function DetalheModal({ agendamento, isGerente, isTour = false, onClose, onRemar
 
         {mostrarAcoes && (
           <>
-            {/* Remarcar — id para o tour */}
             <form id="tour-ag-modal-remarcar" onSubmit={handleRemarcar} className="flex flex-col gap-3 mb-4">
               <p className="text-sm font-medium font-body">Remarcar para:</p>
               <div className="flex gap-2">
@@ -662,7 +656,6 @@ function DetalheModal({ agendamento, isGerente, isTour = false, onClose, onRemar
               </button>
             </form>
 
-            {/* Cancelar — id para o tour */}
             <button
               id="tour-ag-modal-cancelar"
               type="button"
@@ -723,7 +716,6 @@ function SlotsDoDia() {
   const ocupados = slots.filter((s) => !s.livre)
 
   return (
-    // id para o tour apontar
     <div id="tour-ag-slots" className="bg-card border border-border rounded-xl p-4 mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -788,7 +780,6 @@ export default function AgendamentosPage() {
   const [filtroTipo, setFiltroTipo] = useState('')
   const [modoPeriodo, setModoPeriodo] = useState(false)
 
-  // Estado controlado pelo tour para abrir o modal de detalhes com dados fictícios
   const [tourDetalheOpen, setTourDetalheOpen] = useState(false)
 
   const TOUR_AGENDAMENTO = {
@@ -935,7 +926,6 @@ export default function AgendamentosPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botão de ajuda — inicia o tour */}
           <button
             onClick={start}
             className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors text-muted-foreground"
@@ -1082,55 +1072,134 @@ export default function AgendamentosPage() {
           </p>
         </div>
       ) : (
-        <div id="tour-ag-tabela" className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm font-body">
-              <thead className="bg-muted/50">
-                <tr className="text-xs text-muted-foreground uppercase tracking-wide text-left">
-                  {isGerente && <th className="px-4 py-3 font-medium">Cliente</th>}
-                  <th className="px-4 py-3 font-medium">Serviço</th>
-                  <th className="px-4 py-3 font-medium">Data/Hora</th>
-                  <th className="px-4 py-3 font-medium">Tipo</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agendamentos.map((a, i) => (
-                  <tr
-                    key={a?.id || i}
-                    className="border-t border-border hover:bg-muted/30 transition-colors"
-                  >
-                    {isGerente && <td className="px-4 py-3">{a?.clienteNome || '-'}</td>}
-                    <td className="px-4 py-3">{a?.servicoNome || '-'}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatDate(a?.dataHora || a?.data)}{' '}
-                      {formatarHorarioSeguro(a?.horario || a?.horaInicio || a?.dataHora)}
-                    </td>
-                    <td className="px-4 py-3 capitalize">{a?.tipo || 'individual'}</td>
-                    <td className="px-4 py-3">
-                      <span className={statusBadge(a?.status)}>
-                        {statusAgendamentoLabel(a?.status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setSelecionado(a)}
-                        className="text-primary hover:underline text-xs font-body"
-                      >
-                        Detalhes
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div id="tour-ag-tabela">
+
+          {/* ════════════════════════════════════════════════════════════
+              VERSÃO MOBILE — visível apenas em telas menores que sm (< 640px)
+              Exibe cada agendamento como um card empilhado verticalmente.
+              A tabela fica escondida nesse breakpoint (hidden → sm:block).
+          ════════════════════════════════════════════════════════════ */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {agendamentos.map((a, i) => (
+              <div
+               key={`${a.id}-${i}`}
+                className="bg-card border border-border rounded-xl p-4"
+              >
+                {/* Linha superior: nome do cliente (gerente) + badge de status */}
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="min-w-0">
+                    {/* Nome do cliente — só gerente vê */}
+                    {isGerente && (
+                      <p className="font-sans font-semibold text-sm text-foreground truncate">
+                        {a?.clienteNome || '-'}
+                      </p>
+                    )}
+                    {/* Nome do serviço */}
+                    <p className={`font-body text-sm truncate ${isGerente ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>
+                      {a?.servicoNome || '-'}
+                    </p>
+                  </div>
+                  {/* Badge de status */}
+                  <span className={`${statusBadge(a?.status)} shrink-0`}>
+                    {statusAgendamentoLabel(a?.status)}
+                  </span>
+                </div>
+
+                {/* Linha do meio: data/hora e tipo */}
+                <div className="flex items-center gap-4 mb-3">
+                  <div>
+                    <span className="text-xs text-muted-foreground font-body uppercase tracking-wide block mb-0.5">
+                      Data/Hora
+                    </span>
+                    <span className="text-sm font-body text-foreground">
+                      {formatDate(a?.dataHora || a?.data)} · {formatarHorarioSeguro(a?.horario || a?.horaInicio || a?.dataHora)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground font-body uppercase tracking-wide block mb-0.5">
+                      Tipo
+                    </span>
+                    <span className="text-sm font-body capitalize text-foreground">
+                      {a?.tipo || 'individual'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Botão de detalhes — largura total no card */}
+                <button
+                  type="button"
+                  onClick={() => setSelecionado(a)}
+                  className="w-full border border-border rounded-lg py-2 text-sm font-body text-primary hover:bg-muted transition-colors"
+                >
+                  Ver detalhes
+                </button>
+              </div>
+            ))}
           </div>
+          {/* ════════════════════════════════════════════════════════════
+              FIM VERSÃO MOBILE
+          ════════════════════════════════════════════════════════════ */}
+
+
+          {/* ════════════════════════════════════════════════════════════
+              VERSÃO DESKTOP — visível apenas em telas sm+ (≥ 640px)
+              Exibe os agendamentos como uma tabela tradicional com colunas.
+              Os cards ficam escondidos nesse breakpoint (sm:hidden → block).
+          ════════════════════════════════════════════════════════════ */}
+          <div className="hidden sm:block bg-card border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm font-body">
+                <thead className="bg-muted/50">
+                  <tr className="text-xs text-muted-foreground uppercase tracking-wide text-left">
+                    {isGerente && <th className="px-4 py-3 font-medium">Cliente</th>}
+                    <th className="px-4 py-3 font-medium">Serviço</th>
+                    <th className="px-4 py-3 font-medium">Data/Hora</th>
+                    <th className="px-4 py-3 font-medium">Tipo</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agendamentos.map((a, i) => (
+                    <tr
+                      key={a?.id || i}
+                      className="border-t border-border hover:bg-muted/30 transition-colors"
+                    >
+                      {isGerente && <td className="px-4 py-3">{a?.clienteNome || '-'}</td>}
+                      <td className="px-4 py-3">{a?.servicoNome || '-'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {formatDate(a?.dataHora || a?.data)}{' '}
+                        {formatarHorarioSeguro(a?.horario || a?.horaInicio || a?.dataHora)}
+                      </td>
+                      <td className="px-4 py-3 capitalize">{a?.tipo || 'individual'}</td>
+                      <td className="px-4 py-3">
+                        <span className={statusBadge(a?.status)}>
+                          {statusAgendamentoLabel(a?.status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelecionado(a)}
+                          className="text-primary hover:underline text-xs font-body"
+                        >
+                          Detalhes
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {/* ════════════════════════════════════════════════════════════
+              FIM VERSÃO DESKTOP
+          ════════════════════════════════════════════════════════════ */}
+
         </div>
       )}
 
-      {/* Modal de detalhes — abre via clique na tabela OU pelo tour */}
+      {/* Modal de detalhes — abre via clique na tabela/card OU pelo tour */}
       {(selecionado || tourDetalheOpen) && (
         <DetalheModal
           agendamento={selecionado || TOUR_AGENDAMENTO}

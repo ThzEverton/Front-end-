@@ -59,12 +59,40 @@ function fmtMoeda(value) {
 }
 
 function baixarCSV(rows, filename) {
-  const header = ['Data', 'Descricao', 'Tipo', 'Forma', 'Valor', 'Status']
-  const lines = [
-    header.join(','),
-    ...rows.map((r) => [r.Data, `"${r.Descricao}"`, r.Tipo, r.Forma, r.Valor, r.Status].join(',')),
-  ]
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const sep = ';'
+  const header = ['Data', 'Descrição', 'Tipo', 'Forma de Pagamento', 'Valor (R$)', 'Status']
+
+  const linhas = rows.map((r) => [
+    r.Data,
+    `"${r.Descricao}"`,
+    r.Tipo,
+    FORMA_LABEL[r.Forma] || r.Forma,
+    Number(r.Valor).toFixed(2).replace('.', ','),
+    r.Status === 'pago' ? 'Pago' : r.Status,
+  ].join(sep))
+
+  const total = rows.reduce((acc, r) => acc + Number(r.Valor || 0), 0)
+  const rodape = [
+    '',
+    '"Total"',
+    '',
+    '',
+    Number(total).toFixed(2).replace('.', ','),
+    '',
+  ].join(sep)
+
+  const separador = Array(header.length).fill('---').join(sep)
+
+  const conteudo = [
+    header.join(sep),
+    separador,
+    ...linhas,
+    separador,
+    rodape,
+  ].join('\n')
+
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + conteudo], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -72,7 +100,6 @@ function baixarCSV(rows, filename) {
   a.click()
   URL.revokeObjectURL(url)
 }
-
 const FORMA_LABEL = { cartao: 'Cartão', dinheiro: 'Dinheiro', pix: 'Pix' }
 const FORMA_CORES = {
   cartao:   { bg: '#fce7f0', cor: '#993556' },
@@ -81,6 +108,50 @@ const FORMA_CORES = {
   _default: { bg: '#F1EFE8', cor: '#5F5E5A' },
 }
 const getCores = (f) => FORMA_CORES[f] || FORMA_CORES._default
+
+
+function RelatorioUsuarios({ registros }) {
+  const total = registros.length
+  const consultoras = registros.filter(r => r.tipo === 'consultora').length
+  const clientes = registros.filter(r => r.tipo === 'cliente').length
+  const ativos = registros.filter(r => r.status === 'ativo').length
+
+  return (
+    <div>
+      <h1>Relatório de Usuários</h1>
+
+      <div>
+        <p>Total: {total}</p>
+        <p>Consultoras: {consultoras}</p>
+        <p>Clientes: {clientes}</p>
+        <p>Ativos: {ativos}</p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>Perfil</th>
+            <th>Tipo</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {registros.map((u, i) => (
+            <tr key={i}>
+              <td>{u.descricao}</td>
+              <td>{u.email}</td>
+              <td>{u.perfil}</td>
+              <td>{u.tipo}</td>
+              <td>{u.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 // ─── Componente do relatório ──────────────────────────────────────────────────
 

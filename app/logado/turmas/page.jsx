@@ -491,9 +491,21 @@ function DetalhesTurmaModal({ turmaId, onClose, isGerente, onAtualizar }) {
 
   async function handleRemover(userId) {
     if (!userId) { toast.error('Não foi possível identificar o participante.'); return }
+    let converterParaIndividual = false
+    if (participantes.length === 2) {
+      converterParaIndividual = window.confirm(
+        'Ao remover este participante, a turma ficará com apenas uma pessoa. Deseja tornar esse atendimento individual?'
+      )
+    }
+
     try {
-      await apiClient.delete(`/turmas/${turmaId}/participantes/${userId}`)
-      toast.success('Participante removido!')
+      const query = converterParaIndividual ? '?converterParaIndividual=1' : ''
+      await apiClient.delete(`/turmas/${turmaId}/participantes/${userId}${query}`)
+      toast.success(
+        converterParaIndividual
+          ? 'Participante removido e atendimento convertido para individual.'
+          : 'Participante removido!'
+      )
       await fetchDetalhes()
       await onAtualizar()
     } catch (error) {
@@ -507,6 +519,11 @@ function DetalhesTurmaModal({ turmaId, onClose, isGerente, onAtualizar }) {
   const quantidadeParticipantes = getQuantidadeParticipantes(turma, participantes)
   const capacidadeMaxima = getCapacidadeMaxima(turma)
   const turmaCheia = quantidadeParticipantes >= capacidadeMaxima
+  const statusNormalizado = String(turma?.status || '').toLowerCase().trim().replace(/\s+/g, '_')
+  const podeAdicionarParticipante =
+    isGerente &&
+    !turmaCheia &&
+    ['aprovado', 'pendente_aprovacao', 'pendente'].includes(statusNormalizado)
 
   return (
     <>
@@ -582,7 +599,7 @@ function DetalhesTurmaModal({ turmaId, onClose, isGerente, onAtualizar }) {
                     Participantes ({quantidadeParticipantes})
                   </h4>
 
-                  {isGerente && !turmaCheia && (
+                  {podeAdicionarParticipante && (
                     <button
                       onClick={() => setShowAdicionar(true)}
                       className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90"
@@ -775,8 +792,9 @@ function TurmaCard({ turma, isGerente, onVerDetalhes, onEntrar, onSair, onAprova
   const [showMotivo, setShowMotivo] = useState(false)
   const [motivo, setMotivo] = useState('')
 
-  const isPendente = turma?.status === 'pendente aprovacao'
-  const isAprovado = turma?.status === 'aprovado'
+  const statusNormalizado = String(turma?.status || '').toLowerCase().trim().replace(/\s+/g, '_')
+  const isPendente = statusNormalizado === 'pendente_aprovacao' || statusNormalizado === 'pendente'
+  const isAprovado = statusNormalizado === 'aprovado'
   const participando = turma?.participando === true
   const quantidadeParticipantes = getQuantidadeParticipantes(turma)
   const capacidadeMaxima = getCapacidadeMaxima(turma)
