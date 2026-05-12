@@ -870,7 +870,7 @@ export default function AgendaPage() {
 
   async function fetchServicos() {
     try {
-      const data = await apiClient.get('/servicos')
+      const data = await apiClient.get(isGerente ? '/servicos' : '/servicos/visiveis')
       setServicos(Array.isArray(data) ? data : data?.servicos || [])
     } catch {
       setServicos([])
@@ -881,7 +881,7 @@ export default function AgendaPage() {
     fetchSlots(selectedDate)
     fetchConfig()
     fetchServicos()
-  }, [selectedDate])
+  }, [selectedDate, isGerente])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
