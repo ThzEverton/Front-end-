@@ -20,6 +20,10 @@ function formatarHora(timeStr) {
   return String(timeStr).slice(0, 5)
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 // ─── Sub-componente: painel de status / QR Code ───────────────────────────────
 
 function StatusWhatsApp({
@@ -145,6 +149,7 @@ export default function DisparoEmMassa() {
   const [verificando, setVerificando] = useState(false)
   const [conectando, setConectando] = useState(false)
   const [desconectando, setDesconectando] = useState(false)
+  const [destinatarioAtual, setDestinatarioAtual] = useState(null)
 
   const verificarStatus = useCallback(async (silencioso = false) => {
     if (!silencioso) setVerificando(true)
@@ -253,34 +258,52 @@ export default function DisparoEmMassa() {
 
     setDisparando(true)
     setConcluido(false)
+    setErros([])
+    setDestinatarioAtual(null)
     setProgresso({ atual: 0, total: destinatarios.length })
 
     try {
-      const tamanhoLote = 3
-      let enviadosTotal = 0
-      const errosTotal = []
+      const inicio = await apiClient.post('/disparos/executar', { destinatarios })
+      let job = inicio?.data ?? inicio
 
-      for (let i = 0; i < destinatarios.length; i += tamanhoLote) {
-        const lote = destinatarios.slice(i, i + tamanhoLote)
-        const res = await apiClient.post('/disparos/executar', { destinatarios: lote })
-        const payload = res?.data ?? res
-
-        enviadosTotal += Number(payload?.enviados || 0)
-        errosTotal.push(...(payload?.erros || []))
-        setErros([...errosTotal])
-        setProgresso({
-          atual: Math.min(i + lote.length, destinatarios.length),
-          total: destinatarios.length,
-        })
+      if (!job?.id) {
+        const enviados = Number(job?.enviados || 0)
+        const novosErros = job?.erros || []
+        setErros(novosErros)
+        setProgresso({ atual: destinatarios.length, total: destinatarios.length })
+        setConcluido(true)
+        if (!novosErros.length) {
+          toast.success(`Disparo concluído! ${enviados} mensagem(ns) enviada(s).`)
+        } else {
+          toast.warning(`Concluído com ${novosErros.length} erro(s).`)
+        }
+        return
       }
 
-      setProgresso({ atual: destinatarios.length, total: destinatarios.length })
+      while (!job.concluido) {
+        setErros(job.erros || [])
+        setDestinatarioAtual(job.atualNome || null)
+        setProgresso({
+          atual: Math.min(Number(job.atual || 0), Number(job.total || destinatarios.length)),
+          total: Number(job.total || destinatarios.length),
+        })
+
+        await sleep(2000)
+        job = await apiClient.get(`/disparos/jobs/${job.id}`)
+      }
+
+      setErros(job.erros || [])
+      setDestinatarioAtual(null)
+      setProgresso({
+        atual: Number(job.total || destinatarios.length),
+        total: Number(job.total || destinatarios.length),
+      })
       setConcluido(true)
 
-      if (!errosTotal.length) {
-        toast.success(`Disparo concluído! ${enviadosTotal} mensagem(ns) enviada(s).`)
+      if (!job.erros?.length) {
+        toast.success(`Disparo concluído! ${job.enviados} mensagem(ns) enviada(s).`)
       } else {
-        toast.warning(`Concluído com ${errosTotal.length} erro(s).`)
+        toast.warning(`Concluído com ${job.erros.length} erro(s).`)
       }
     } catch (err) {
       const msg = err?.data?.error || err?.message || 'Erro ao disparar mensagens.'
@@ -289,6 +312,7 @@ export default function DisparoEmMassa() {
         verificarStatus() // busca QR atualizado
       }
     } finally {
+      setDestinatarioAtual(null)
       setDisparando(false)
     }
   }
@@ -485,6 +509,11 @@ export default function DisparoEmMassa() {
             <span>{disparando ? 'Enviando mensagens...' : 'Disparo concluído'}</span>
             <span>{porcentagem}%</span>
           </div>
+          {disparando && destinatarioAtual && (
+            <p className="text-xs text-muted-foreground font-body">
+              Enviando para {destinatarioAtual}...
+            </p>
+          )}
           <div className="w-full bg-muted rounded-full h-1.5">
             <div
               className={`h-1.5 rounded-full transition-all duration-300 ${
