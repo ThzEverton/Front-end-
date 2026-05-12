@@ -256,18 +256,31 @@ export default function DisparoEmMassa() {
     setProgresso({ atual: 0, total: destinatarios.length })
 
     try {
-      const res = await apiClient.post('/disparos/executar', { destinatarios })
-      const payload = res?.data ?? res
-      const { enviados, erros: novosErros } = payload
+      const tamanhoLote = 3
+      let enviadosTotal = 0
+      const errosTotal = []
 
-      setErros(novosErros || [])
+      for (let i = 0; i < destinatarios.length; i += tamanhoLote) {
+        const lote = destinatarios.slice(i, i + tamanhoLote)
+        const res = await apiClient.post('/disparos/executar', { destinatarios: lote })
+        const payload = res?.data ?? res
+
+        enviadosTotal += Number(payload?.enviados || 0)
+        errosTotal.push(...(payload?.erros || []))
+        setErros([...errosTotal])
+        setProgresso({
+          atual: Math.min(i + lote.length, destinatarios.length),
+          total: destinatarios.length,
+        })
+      }
+
       setProgresso({ atual: destinatarios.length, total: destinatarios.length })
       setConcluido(true)
 
-      if (!novosErros?.length) {
-        toast.success(`Disparo concluído! ${enviados} mensagem(ns) enviada(s).`)
+      if (!errosTotal.length) {
+        toast.success(`Disparo concluído! ${enviadosTotal} mensagem(ns) enviada(s).`)
       } else {
-        toast.warning(`Concluído com ${novosErros.length} erro(s).`)
+        toast.warning(`Concluído com ${errosTotal.length} erro(s).`)
       }
     } catch (err) {
       const msg = err?.data?.error || err?.message || 'Erro ao disparar mensagens.'
