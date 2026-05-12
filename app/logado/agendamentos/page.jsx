@@ -42,6 +42,9 @@ function normalizarStatus(status) {
     concluido: 'CONCLUIDO',
     cancelado: 'CANCELADO',
     remarcado: 'REMARCADO',
+    aprovado: 'APROVADO',
+    recusado: 'RECUSADO',
+    pendente_aprovacao: 'PENDENTE_APROVACAO',
   }
   return map[s] || String(status || '').toUpperCase()
 }
@@ -53,6 +56,9 @@ function statusParaApi(status) {
     CONCLUIDO: 'concluido',
     CANCELADO: 'cancelado',
     REMARCADO: 'remarcado',
+    APROVADO: 'aprovado',
+    RECUSADO: 'recusado',
+    PENDENTE_APROVACAO: 'pendente_aprovacao',
   }
   return map[status] || status
 }
@@ -158,6 +164,9 @@ function statusBadge(status) {
     CONCLUIDO: 'bg-green-100 text-green-700',
     CANCELADO: 'bg-destructive/10 text-destructive',
     REMARCADO: 'bg-yellow-100 text-yellow-700',
+    APROVADO: 'bg-green-100 text-green-700',
+    RECUSADO: 'bg-destructive/10 text-destructive',
+    PENDENTE_APROVACAO: 'bg-yellow-100 text-yellow-700',
   }
   return `text-xs px-2 py-0.5 rounded-full font-body ${map[status] || 'bg-muted text-muted-foreground'}`
 }

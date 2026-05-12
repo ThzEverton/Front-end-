@@ -68,13 +68,20 @@ async function request(method, endpoint, body) {
 
     if (!response.ok) {
       const message =
-        (typeof data === 'object' && (data?.message || data?.error)) ||
+        (typeof data === 'object' && (data?.msg || data?.message || data?.error)) ||
         `Erro ${response.status}`
-      throw new Error(message)
+      const error = new Error(message)
+      error.status = response.status
+      error.data = data
+      throw error
     }
 
     return data
   } catch (error) {
+    if (error instanceof TypeError) {
+      error.message = 'Nao foi possivel conectar ao servidor. Confira se o back-end esta rodando.'
+    }
+
     if (error.message !== 'Sessão expirada. Faça login novamente.') {
       toast.error(error.message || 'Erro ao conectar com o servidor')
     }

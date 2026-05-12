@@ -577,7 +577,13 @@ function AgendarModal({ slot, data, servicos, slots, isGerente, isTour = false, 
       .get('/users')
       .then((data) => {
         const lista = Array.isArray(data) ? data : data?.users || []
-        setClientes(lista.filter((u) => u.ativo !== false && u.ativo !== 0))
+        setClientes(
+          lista.filter((u) => {
+            const ativo = u.ativo !== false && u.ativo !== 0
+            const cliente = (u.perfil || 'cliente') === 'cliente'
+            return ativo && cliente
+          })
+        )
       })
       .catch(() => setClientes([]))
       .finally(() => setLoadingClientes(false))
@@ -864,7 +870,7 @@ export default function AgendaPage() {
 
   async function fetchServicos() {
     try {
-      const data = await apiClient.get('/servicos')
+      const data = await apiClient.get(isGerente ? '/servicos' : '/servicos/visiveis')
       setServicos(Array.isArray(data) ? data : data?.servicos || [])
     } catch {
       setServicos([])
@@ -875,7 +881,7 @@ export default function AgendaPage() {
     fetchSlots(selectedDate)
     fetchConfig()
     fetchServicos()
-  }, [selectedDate])
+  }, [selectedDate, isGerente])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 

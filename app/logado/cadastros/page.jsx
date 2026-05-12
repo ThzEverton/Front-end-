@@ -37,6 +37,11 @@ function fmtData(date) {
   return new Date(date).toLocaleDateString('pt-BR')
 }
 
+function normalizarDataInput(valor) {
+  if (!valor) return ''
+  return String(valor).slice(0, 10)
+}
+
 function fmtMoeda(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
@@ -461,8 +466,9 @@ function UsuariosTab() {
   const usuariosFiltrados = usuarios.filter((u) => {
     if (filtroConsultora && !u.isConsultora && !u.is_consultora) return false
     if (filtroAniversario) {
-      if (!u.dataNascimento) return false
-      const mes = parseInt(u.dataNascimento.split('-')[1], 10)
+      const dataNascimento = normalizarDataInput(u.dataNascimento || u.data_nascimento)
+      if (!dataNascimento) return false
+      const mes = parseInt(dataNascimento.split('-')[1], 10)
       if (mes !== mesAtual) return false
     }
     return true
@@ -562,8 +568,9 @@ function UsuariosTab() {
             <tbody>
               {usuariosFiltrados.map((u, i) => {
                 const isAniversariante = (() => {
-                  if (!u.dataNascimento) return false
-                  const mes = parseInt(u.dataNascimento.split('-')[1], 10)
+                  const dataNascimento = normalizarDataInput(u.dataNascimento || u.data_nascimento)
+                  if (!dataNascimento) return false
+                  const mes = parseInt(dataNascimento.split('-')[1], 10)
                   return mes === mesAtual
                 })()
                 const mensagemAniversario = `Olá ${u.nome.split(' ')[0]}! 🎂 Feliz aniversário! Que seu dia seja incrível!`
@@ -640,7 +647,7 @@ function UsuarioModal({ usuario, onClose, onSalvo }) {
     nome:           usuario?.nome || '',
     email:          usuario?.email || '',
     telefone:       usuario?.telefone || '',
-    dataNascimento: usuario?.dataNascimento || usuario?.data_nascimento || '',
+    dataNascimento: normalizarDataInput(usuario?.dataNascimento || usuario?.data_nascimento),
     perfil:         usuario?.perfil || 'cliente',
     senha:          '',
     isConsultora:   Boolean(usuario?.isConsultora || usuario?.is_consultora || false),

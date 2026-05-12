@@ -60,6 +60,10 @@ export function statusAgendamentoLabel(status) {
     CONCLUIDO: 'Concluído',
     CANCELADO: 'Cancelado',
     REMARCADO: 'Remarcado',
+    PENDENTE: 'Pendente',
+    APROVADO: 'Aprovado',
+    RECUSADO: 'Recusado',
+    PENDENTE_APROVACAO: 'Pendente',
   }
   return map[status] || status
 }
