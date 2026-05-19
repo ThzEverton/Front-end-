@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/context/userContext'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const { login } = useUser()
@@ -25,14 +25,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-secondary flex items-center justify-center px-4">
+    <div className="relative min-h-screen bg-secondary flex items-center justify-center px-4 py-10">
+      <Link
+        href="/"
+        className="absolute left-4 top-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary font-body sm:left-6 sm:top-6"
+      >
+        <ArrowLeft size={16} />
+        Voltar
+      </Link>
+
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="font-sans text-3xl font-bold text-primary">
             Sala Rosa
           </Link>
-          <p className="text-muted-foreground mt-2 font-body text-sm">
+          <p className="text-center text-muted-foreground mt-2 font-body text-sm">
             Bem-vinda de volta!
           </p>
         </div>
