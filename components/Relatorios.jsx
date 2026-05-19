@@ -21,15 +21,16 @@ export function RelatorioProvider({ children }) {
       {config && (
         <div
           style={st.overlay}
+          className="relatorio-overlay"
           onClick={(e) => e.target === e.currentTarget && fecharRelatorio()}
         >
-          <div style={st.modal}>
-            <button style={st.btnFechar} onClick={fecharRelatorio} aria-label="Fechar">
+          <div style={st.modal} className="relatorio-modal-print">
+            <button style={st.btnFechar} className="no-print" onClick={fecharRelatorio} aria-label="Fechar">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <path d="M4 4l8 8M12 4l-8 8" />
               </svg>
             </button>
-            <div style={st.scrollArea}>
+            <div style={st.scrollArea} className="relatorio-scroll-print">
               <RelatorioFinanceiro {...config} />
             </div>
           </div>
@@ -52,6 +53,12 @@ export function useRelatorio() {
 function fmtData(date) {
   if (!date) return '-'
   return new Date(date).toLocaleDateString('pt-BR')
+}
+
+function fmtHora(date, fallback) {
+  if (fallback) return fallback
+  if (!date) return '-'
+  return new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function fmtMoeda(value) {
@@ -100,6 +107,28 @@ function baixarCSV(rows, filename) {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+function baixarCSVAgenda(rows, filename) {
+  const sep = ';'
+  const header = ['Data', 'Horário', 'Descrição', 'Status']
+  const linhas = rows.map((r) => [
+    r.Data,
+    r.Horario,
+    `"${r.Descricao}"`,
+    r.Status,
+  ].join(sep))
+
+  const conteudo = [header.join(sep), ...linhas].join('\n')
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + conteudo], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const FORMA_LABEL = { cartao: 'Cartão', dinheiro: 'Dinheiro', pix: 'Pix' }
 const FORMA_CORES = {
   cartao:   { bg: '#fce7f0', cor: '#993556' },
@@ -108,6 +137,18 @@ const FORMA_CORES = {
   _default: { bg: '#F1EFE8', cor: '#5F5E5A' },
 }
 const getCores = (f) => FORMA_CORES[f] || FORMA_CORES._default
+
+const STATUS_CORES = {
+  agendado: { bg: '#E1F5EE', cor: '#0F6E56' },
+  concluido: { bg: '#E6F1FB', cor: '#185FA5' },
+  finalizado: { bg: '#E6F1FB', cor: '#185FA5' },
+  cancelado: { bg: '#FBE7EA', cor: '#A33A48' },
+  recusado: { bg: '#FBE7EA', cor: '#A33A48' },
+  pendente: { bg: '#FFF3D9', cor: '#8A5A00' },
+  remarcado: { bg: '#FCE7F0', cor: '#993556' },
+  _default: { bg: '#F1EFE8', cor: '#5F5E5A' },
+}
+const getStatusCores = (status) => STATUS_CORES[(status || '').toString().toLowerCase()] || STATUS_CORES._default
 
 
 function RelatorioUsuarios({ registros }) {
@@ -164,8 +205,10 @@ function RelatorioFinanceiro({
   statusFiltro  = 'pago',
   nomeArquivo   = 'relatorio_financeiro.csv',
   accentColor   = '#d4537e',
+  modoRelatorio = 'financeiro',
 }) {
   const [exportado, setExportado] = useState(false)
+  const isAgenda = modoRelatorio === 'agenda'
 
   const itens = useMemo(() => registros.filter((r) => {
     const statusOk = statusFiltro ? r?.status === statusFiltro : true
@@ -175,6 +218,11 @@ function RelatorioFinanceiro({
 
   const total      = useMemo(() => itens.reduce((acc, r) => acc + Number(r?.valor || 0), 0), [itens])
   const ticketMed  = itens.length > 0 ? total / itens.length : 0
+  const statusCounts = useMemo(() => itens.reduce((acc, r) => {
+    const status = (r?.status || 'sem status').toString().toLowerCase()
+    acc[status] = (acc[status] || 0) + 1
+    return acc
+  }, {}), [itens])
 
   const porForma = useMemo(() => itens.reduce((acc, r) => {
     const f = r?.formaPagto || '_default'
@@ -188,6 +236,17 @@ function RelatorioFinanceiro({
 
   function handleCSV() {
     if (!itens.length) return
+    if (isAgenda) {
+      baixarCSVAgenda(itens.map((r) => ({
+        Data: fmtData(r?.dataRef),
+        Horario: fmtHora(r?.dataRef, r?.horario),
+        Descricao: r?.descricao || '-',
+        Status: r?.status || '-',
+      })), nomeArquivo)
+      setExportado(true)
+      setTimeout(() => setExportado(false), 2000)
+      return
+    }
     baixarCSV(itens.map((r) => ({
       Data:      fmtData(r?.dataRef),
       Descricao: r?.descricao || '-',
@@ -200,10 +259,25 @@ function RelatorioFinanceiro({
     setTimeout(() => setExportado(false), 2000)
   }
 
+  function handlePrint() {
+    window.print()
+  }
+
   const accentBg = accentColor + '15'
+  const metricas = isAgenda
+    ? [
+        { label: 'Agendamentos', value: itens.length, cor: accentColor, icon: <IcoCalendar cor={accentColor} /> },
+        { label: 'Agendados', value: statusCounts.agendado || 0, icon: <IcoCheck2 /> },
+        { label: 'Finalizados', value: (statusCounts.concluido || 0) + (statusCounts.finalizado || 0), icon: <IcoChart /> },
+      ]
+    : [
+        { label: 'Total', value: fmtMoeda(total), cor: accentColor, icon: <IcoMoney cor={accentColor} /> },
+        { label: 'Registros', value: itens.length, icon: <IcoCheck2 /> },
+        { label: 'Ticket médio', value: fmtMoeda(ticketMed), icon: <IcoChart /> },
+      ]
 
   return (
-    <div style={r.page}>
+    <div style={r.page} className="relatorio-page">
 
       {/* Cabeçalho */}
       <div style={r.header}>
@@ -212,24 +286,32 @@ function RelatorioFinanceiro({
           <h1 style={r.titulo}>{titulo}</h1>
           <p style={r.subtitulo}>{dataLabel}</p>
         </div>
-        <button
-          style={{ ...r.btnExport, background: exportado ? '#0F6E56' : accentColor, borderColor: exportado ? '#0F6E56' : accentColor, opacity: itens.length === 0 ? 0.4 : 1 }}
-          onClick={handleCSV}
-          disabled={!itens.length}
-        >
-          {exportado ? <><IcoCheck /> Exportado!</> : <><IcoDl /> Exportar CSV</>}
-        </button>
+        <div style={r.actions} className="no-print">
+          <button
+            style={{ ...r.btnPrint, borderColor: accentColor, color: accentColor }}
+            onClick={handlePrint}
+          >
+            <IcoPrint /> Imprimir
+          </button>
+          <button
+            style={{ ...r.btnExport, background: exportado ? '#0F6E56' : accentColor, borderColor: exportado ? '#0F6E56' : accentColor, opacity: itens.length === 0 ? 0.4 : 1 }}
+            onClick={handleCSV}
+            disabled={!itens.length}
+          >
+            {exportado ? <><IcoCheck /> Exportado!</> : <><IcoDl /> Exportar CSV</>}
+          </button>
+        </div>
       </div>
 
       {/* Métricas */}
       <div style={r.metricsGrid}>
-        <MetCard label="Total"        value={fmtMoeda(total)}      cor={accentColor} icon={<IcoMoney cor={accentColor} />} />
-        <MetCard label="Registros"    value={itens.length}                            icon={<IcoCheck2 />} />
-        <MetCard label="Ticket médio" value={fmtMoeda(ticketMed)}                    icon={<IcoChart />} />
+        {metricas.map((metrica) => (
+          <MetCard key={metrica.label} {...metrica} />
+        ))}
       </div>
 
       {/* Por forma */}
-      {Object.keys(porForma).length > 0 && (
+      {!isAgenda && Object.keys(porForma).length > 0 && (
         <div style={r.section}>
           <p style={r.secLabel}>Por forma de pagamento</p>
           <div style={r.formaGrid}>
@@ -251,7 +333,7 @@ function RelatorioFinanceiro({
 
       {/* Tabela */}
       <div style={r.section}>
-        <p style={r.secLabel}>Lançamentos</p>
+        <p style={r.secLabel}>{isAgenda ? 'Agendamentos' : 'Lançamentos'}</p>
         {!itens.length ? (
           <div style={r.vazio}>Nenhum registro encontrado.</div>
         ) : (
@@ -259,7 +341,7 @@ function RelatorioFinanceiro({
             <table style={r.table}>
               <thead>
                 <tr style={{ background: accentBg }}>
-                  {['Data', 'Descrição', 'Forma', 'Valor', 'Status'].map((col) => (
+                  {(isAgenda ? ['Data', 'Horário', 'Descrição', 'Status'] : ['Data', 'Descrição', 'Forma', 'Valor', 'Status']).map((col) => (
                     <th key={col} style={{ ...r.th, color: accentColor }}>{col}</th>
                   ))}
                 </tr>
@@ -268,22 +350,24 @@ function RelatorioFinanceiro({
                 {itens.map((item, i) => {
                   const forma = item?.formaPagto || '_default'
                   const { bg, cor } = getCores(forma)
+                  const statusStyle = getStatusCores(item?.status)
                   return (
                     <tr key={i} style={r.tr}>
                       <td style={{ ...r.td, ...r.tdMuted }}>{fmtData(item?.dataRef)}</td>
+                      {isAgenda && <td style={{ ...r.td, ...r.tdMuted, color: '#5F5E5A' }}>{fmtHora(item?.dataRef, item?.horario)}</td>}
                       <td style={{ ...r.td, fontWeight: 500 }}>{item?.descricao || '-'}</td>
-                      <td style={r.td}><span style={{ ...r.badge, background: bg, color: cor }}>{FORMA_LABEL[forma] || forma}</span></td>
-                      <td style={{ ...r.td, fontWeight: 600, color: '#0F6E56', fontVariantNumeric: 'tabular-nums' }}>{fmtMoeda(item?.valor)}</td>
-                      <td style={r.td}><span style={r.statusBadge}>{item?.status}</span></td>
+                      {!isAgenda && <td style={r.td}><span style={{ ...r.badge, background: bg, color: cor }}>{FORMA_LABEL[forma] || forma}</span></td>}
+                      {!isAgenda && <td style={{ ...r.td, fontWeight: 600, color: '#0F6E56', fontVariantNumeric: 'tabular-nums' }}>{fmtMoeda(item?.valor)}</td>}
+                      <td style={r.td}><span style={{ ...r.statusBadge, background: statusStyle.bg, color: statusStyle.cor }}>{item?.status}</span></td>
                     </tr>
                   )
                 })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} style={{ ...r.td, ...r.tfootLabel }}>Total</td>
-                  <td style={{ ...r.td, ...r.tfootTotal, color: accentColor }}>{fmtMoeda(total)}</td>
-                  <td style={r.td} />
+                  <td colSpan={isAgenda ? 3 : 3} style={{ ...r.td, ...r.tfootLabel }}>Total</td>
+                  <td style={{ ...r.td, ...r.tfootTotal, color: accentColor }}>{isAgenda ? itens.length : fmtMoeda(total)}</td>
+                  {!isAgenda && <td style={r.td} />}
                 </tr>
               </tfoot>
             </table>
@@ -315,6 +399,8 @@ const IcoCheck = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="non
 const IcoMoney = ({ cor }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={cor || '#d4537e'} strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v12M9 9.5C9 8.1 10.3 7 12 7s3 1.1 3 2.5-1.3 2.5-3 2.5-3 1.1-3 2.5S10.3 17 12 17s3-1.1 3-2.5" /></svg>
 const IcoCheck2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" /></svg>
 const IcoChart  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="1.6" strokeLinecap="round"><path d="M4 20V10M9 20V4M14 20v-7M19 20v-4" /></svg>
+const IcoPrint  = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5V2h6v3M5 12H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2M5 10h6v4H5z" /></svg>
+const IcoCalendar = ({ cor }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={cor || '#d4537e'} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="3" /><path d="M8 2v4M16 2v4M3 10h18M8 15h.01M12 15h.01M16 15h.01" /></svg>
 
 // ─── Estilos do modal ─────────────────────────────────────────────────────────
 
@@ -347,7 +433,9 @@ const r = {
   eyebrow:    { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 },
   titulo:     { fontSize: 28, fontWeight: 600, margin: '0 0 4px', letterSpacing: '-0.02em', lineHeight: 1.2 },
   subtitulo:  { fontSize: 13, color: '#999', margin: 0 },
+  actions:    { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
   btnExport:  { display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 10, border: '1.5px solid', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'opacity 0.15s, background 0.2s', fontFamily: 'inherit' },
+  btnPrint:   { display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', borderRadius: 10, border: '1.5px solid', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   metricsGrid:{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '2rem' },
   metricCard: { background: '#fafafa', border: '1px solid #f0ece8', borderRadius: 14, padding: '18px 20px' },
   metricLabel:{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 },

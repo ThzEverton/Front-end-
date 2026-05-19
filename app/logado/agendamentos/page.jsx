@@ -891,6 +891,7 @@ export default function AgendamentosPage() {
     abrirRelatorio({
       registros: agendamentos.map((a) => ({
         dataRef: a?.dataHora || a?.data,
+        horario: a?.horario || a?.horaInicio,
         descricao: `${a?.servicoNome} — ${a?.clienteNome}`,
         formaPagto: '-',
         valor: 0,
@@ -901,6 +902,7 @@ export default function AgendamentosPage() {
       eyebrow: 'Sala Rosa · Agenda',
       statusFiltro: '',
       tipo: 'TODOS',
+      modoRelatorio: 'agenda',
       accentColor: '#d4537e',
       nomeArquivo: 'agendamentos_sala_rosa.csv',
     })
