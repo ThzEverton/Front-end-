@@ -8,7 +8,7 @@ import {
   Loader2, Plus, Trash2, X, ShoppingCart,
   CreditCard, Banknote, QrCode, Eye, Package, Scissors,
   CheckCircle2, ChevronLeft, ChevronRight, HelpCircle,
-  Lightbulb, Info
+  Lightbulb, CalendarClock, Search
 } from 'lucide-react'
 
 const FORMA_LABEL = { dinheiro: 'Dinheiro', cartao: 'Cartão', pix: 'PIX' }
@@ -36,6 +36,25 @@ function FormaBadge({ forma }) {
       {Icon && <Icon size={12} />} {FORMA_LABEL[forma]}
     </span>
   ) : <span className="text-xs text-muted-foreground">—</span>
+}
+
+function formatAgendamentoDate(value) {
+  if (!value) return 'Data não informada'
+  return new Date(value).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+}
+
+function formatAgendamentoTime(value) {
+  if (!value) return ''
+  return String(value).slice(0, 5)
+}
+
+function getAgendamentoLabel(agendamento) {
+  const cliente = agendamento?.participante?.nome || agendamento?.criadoPor?.nome || 'Cliente sem nome'
+  const servico = agendamento?.servico?.nome || 'Serviço'
+  const data = formatAgendamentoDate(agendamento?.data)
+  const hora = formatAgendamentoTime(agendamento?.horaInicio)
+  const status = agendamento?.status ? ` · ${agendamento.status}` : ''
+  return `${data}${hora ? ` às ${hora}` : ''} · ${cliente} · ${servico}${status}`
 }
 
 // ─── TOUR TOOLTIP ────────────────────────────────────────────────────────────
@@ -333,9 +352,11 @@ function NovaVendaModal({ onClose, onSalvo }) {
   const [produtos, setProdutos] = useState([])
   const [servicos, setServicos] = useState([])
   const [clientes, setClientes] = useState([])
+  const [agendamentos, setAgendamentos] = useState([])
   const [itens, setItens] = useState([])
   const [vinculoTipo, setVinculoTipo] = useState('nenhum')
   const [agendamentoId, setAgendamentoId] = useState('')
+  const [agendamentoBusca, setAgendamentoBusca] = useState('')
   const [clienteId, setClienteId] = useState('')
   const [formaPagto, setFormaPagto] = useState('')
   const [statusPagto, setStatusPagto] = useState('pendente')
@@ -348,7 +369,7 @@ function NovaVendaModal({ onClose, onSalvo }) {
     { selector: '#tour-nova-header', title: 'Registrar nova venda', body: 'Este formulário permite criar uma nova venda do zero. Você pode adicionar produtos do estoque e serviços prestados, informar como o cliente pagou e salvar tudo de uma vez.', tip: 'Você pode adicionar quantos produtos e serviços quiser na mesma venda.' },
     { selector: '#tour-forma-pagamento', title: 'Forma de pagamento', body: 'Selecione como o cliente vai pagar: Dinheiro (espécie), Cartão (crédito ou débito) ou PIX (transferência instantânea). Este campo é obrigatório.', tip: 'Você pode mudar a forma de pagamento depois, na tela de detalhes da venda.' },
     { selector: '#tour-status-pagamento', title: 'Status do pagamento', body: 'Define a situação atual do pagamento. Use "Pendente" se ainda não recebeu, "Pago" se já foi quitado, "Cancelado" se a venda não foi realizada, ou "Estornado" se devolveu o dinheiro.', tip: 'O padrão é "Pendente". Altere para "Pago" quando o pagamento for confirmado.' },
-    { selector: '#tour-vinculo', title: 'Vincular venda', body: 'Campo opcional. A venda pode ficar avulsa, ser vinculada a um atendimento pelo ID, ou ser vinculada diretamente a uma cliente.' },
+    { selector: '#tour-vinculo', title: 'Vincular venda', body: 'Campo opcional. A venda pode ficar avulsa, ser vinculada a um atendimento selecionado pela cliente, serviço, data e horário, ou diretamente a uma cliente.' },
     { selector: '#tour-observacao-nova', title: 'Observação', body: 'Campo de texto livre para anotações internas. Exemplos: "venda avulsa sem agendamento", "cliente pediu nota fiscal", "pacote de 5 sessões". Não aparece para o cliente.' },
     { selector: '#tour-produtos', title: 'Adicionar produtos', body: 'Clique em qualquer produto para adicioná-lo à venda. O botão mostra o nome, preço unitário e quantidade disponível em estoque. Produtos sem estoque ficam desabilitados.', tip: 'Clique no mesmo produto várias vezes para aumentar a quantidade, ou ajuste direto na tabela de itens.' },
     { selector: '#tour-servicos', title: 'Adicionar serviços', body: 'Aqui ficam os serviços disponíveis para venda (ex: corte, coloração, massagem). Não possuem controle de estoque, então você pode adicionar quantas vezes quiser.' },
@@ -360,12 +381,17 @@ function NovaVendaModal({ onClose, onSalvo }) {
   useEffect(() => {
     async function load() {
       try {
-        const [p, s, u] = await Promise.all([apiClient.get('/produtos'), apiClient.get('/servicos'), apiClient.get('/users')])
+        const [p, s, u, a] = await Promise.all([apiClient.get('/produtos'), apiClient.get('/servicos'), apiClient.get('/users'), apiClient.get('/agendamentos')])
         const prods = (Array.isArray(p) ? p : p?.produtos || []).map(prod => ({ ...prod, preco: Number(prod.precoVenda ?? prod.preco_venda ?? prod.preco ?? prod.valor ?? 0), estoqueAtual: Number(prod.estoqueAtual ?? prod.estoque_atual ?? 0) }))
         const servs = (Array.isArray(s) ? s : s?.servicos || []).map(serv => ({ ...serv, preco: Number(serv.preco ?? serv.valor ?? 0) }))
         const users = Array.isArray(u) ? u : u?.users || []
+        const atendimentos = Array.isArray(a) ? a : a?.agendamentos || []
         setProdutos(prods)
         setServicos(servs)
+        setAgendamentos(atendimentos.filter(item => {
+          const status = String(item?.status || '').toLowerCase()
+          return status !== 'cancelado'
+        }))
         setClientes(users.filter(user => {
           const ativo = user.ativo !== false && user.ativo !== 0
           const cliente = (user.perfil || 'cliente') === 'cliente'
@@ -401,12 +427,18 @@ function NovaVendaModal({ onClose, onSalvo }) {
   }
 
   const subtotal = itens.reduce((acc, i) => acc + i.preco * i.quantidade, 0)
+  const agendamentoSelecionado = agendamentos.find(a => String(a.id) === String(agendamentoId))
+  const agendamentosFiltrados = agendamentos.filter(agendamento => {
+    const termo = agendamentoBusca.trim().toLowerCase()
+    if (!termo) return true
+    return getAgendamentoLabel(agendamento).toLowerCase().includes(termo)
+  }).slice(0, 40)
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (itens.length === 0) { toast.error('Adicione pelo menos um item à venda.'); return }
     if (!formaPagto) { toast.error('Selecione a forma de pagamento.'); return }
-    if (vinculoTipo === 'agendamento' && !agendamentoId.trim()) { toast.error('Informe o ID do atendimento.'); return }
+    if (vinculoTipo === 'agendamento' && !agendamentoId) { toast.error('Selecione o atendimento.'); return }
     if (vinculoTipo === 'cliente' && !clienteId) { toast.error('Selecione uma cliente.'); return }
 
     const payload = {
@@ -417,7 +449,11 @@ function NovaVendaModal({ onClose, onSalvo }) {
       total: subtotal,
     }
 
-    if (vinculoTipo === 'agendamento') payload.agendamentoId = agendamentoId.trim()
+    if (vinculoTipo === 'agendamento') {
+      payload.agendamentoId = Number(agendamentoId)
+      const participanteId = agendamentoSelecionado?.participante?.id
+      if (participanteId) payload.clienteId = Number(participanteId)
+    }
     if (vinculoTipo === 'cliente') payload.clienteId = Number(clienteId)
 
     setLoading(true)
@@ -474,6 +510,7 @@ function NovaVendaModal({ onClose, onSalvo }) {
                   onChange={e => {
                     setVinculoTipo(e.target.value)
                     setAgendamentoId('')
+                    setAgendamentoBusca('')
                     setClienteId('')
                   }}
                   className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body mb-2"
@@ -484,7 +521,42 @@ function NovaVendaModal({ onClose, onSalvo }) {
                 </select>
 
                 {vinculoTipo === 'agendamento' && (
-                  <input type="text" value={agendamentoId} onChange={e => setAgendamentoId(e.target.value)} placeholder="ID do atendimento" className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="search"
+                        value={agendamentoBusca}
+                        onChange={e => setAgendamentoBusca(e.target.value)}
+                        placeholder="Buscar por cliente, serviço ou data"
+                        className="w-full border border-input rounded-lg pl-9 pr-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+                      />
+                    </div>
+                    <select
+                      value={agendamentoId}
+                      onChange={e => setAgendamentoId(e.target.value)}
+                      className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body"
+                    >
+                      <option value="">Selecione um atendimento...</option>
+                      {agendamentosFiltrados.map(agendamento => (
+                        <option key={agendamento.id} value={agendamento.id}>
+                          {getAgendamentoLabel(agendamento)}
+                        </option>
+                      ))}
+                    </select>
+                    {agendamentoSelecionado ? (
+                      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground font-body">
+                        <p className="flex items-center gap-1.5 text-foreground font-medium">
+                          <CalendarClock size={13} /> Atendimento selecionado
+                        </p>
+                        <p className="mt-1">{getAgendamentoLabel(agendamentoSelecionado)}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground font-body">
+                        Escolha pelo nome da cliente, serviço, data ou horário.
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {vinculoTipo === 'cliente' && (
