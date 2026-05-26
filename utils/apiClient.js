@@ -1,6 +1,6 @@
 /**
  * apiClient.js — Cliente centralizado para consumo da API real.
- * Base URL: NEXT_PUBLIC_API_URL (fallback: http://localhost:5000)
+ * Base URL: NEXT_PUBLIC_API_URL (fallback: /api)
  *
  * Todos os métodos tratam erros, exibem toast e redirecionam para /login em caso de 401.
  */
@@ -8,7 +8,7 @@
 import { toast } from 'sonner'
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+  process.env.NEXT_PUBLIC_API_URL || '/api'
 
 function getToken() {
   if (typeof window === 'undefined') return null
