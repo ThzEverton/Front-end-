@@ -14,30 +14,30 @@ import {
 const servicos = [
   {
     icon: Sparkles,
-    nome: 'Consultoria de Imagem',
-    desc: 'Análise personalizada de estilo, coloração e identidade visual para realçar sua beleza única.',
+    nome: 'Análise Personalizada da Pele',
+    desc: 'Avaliação em 10 dimensões para entender sua pele e indicar os produtos ideais para a sua rotina.',
   },
   {
     icon: Heart,
-    nome: 'Tratamentos Estéticos',
-    desc: 'Procedimentos faciais e corporais com produtos premium para cuidar de você por completo.',
+    nome: 'Teste de Tons de Base',
+    desc: 'Teste presencial ou online para encontrar o tom de base ideal com uma especialista Mary Kay.',
   },
   {
     icon: Star,
     nome: 'Maquiagem Profissional',
-    desc: 'Make para eventos, noivas e ocasiões especiais com técnicas modernas e duradouras.',
+    desc: 'Maquiagem para eventos, com especialidade em pele madura e técnicas modernas de longa duração.',
   },
   {
     icon: Shield,
-    nome: 'Treinamento para Consultoras',
-    desc: 'Capacitação exclusiva para mulheres que desejam empreender na área de beleza.',
+    nome: 'Modo de Uso dos Produtos',
+    desc: 'Orientação prática para você aprender como usar cada produto Mary Kay no dia a dia.',
   },
 ]
 
 const beneficios = [
   {
     titulo: 'Ambiente Exclusivo',
-    desc: 'Espaço pensado para você se sentir em casa, com toda a privacidade que merece.',
+    desc: 'Espaço pensado para você se sentir em casa, com toda a exclusividade que merece.',
   },
   {
     titulo: 'Equipe Especializada',
@@ -48,8 +48,8 @@ const beneficios = [
     desc: 'Marque seu horário em minutos pelo nosso sistema online, 24 horas por dia.',
   },
   {
-    titulo: 'Produtos Premium',
-    desc: 'Trabalhamos apenas com marcas selecionadas, seguras e de alta performance.',
+    titulo: 'Mary Kay',
+    desc: 'Trabalhamos com a Mary Kay, marca renomada com mais de 62 anos de história no mercado da beleza.',
   },
 ]
 
@@ -64,7 +64,7 @@ const faqs = [
   },
   {
     q: 'O que é uma consultora?',
-    a: 'Consultoras são clientes especiais que passaram por nosso programa de capacitação e têm acesso a serviços exclusivos e condições diferenciadas.',
+    a: 'É uma profissional especializada em orientar suas clientes, desde a escolha dos produtos até o modo correto de uso na rotina de beleza.',
   },
   {
     q: 'Atendimento em grupo é possível?',
@@ -91,9 +91,9 @@ function FaqItem({ q, a }) {
   )
 }
 
-const WHATSAPP_NUMBER = '5500000000000' // TODO: trocar pelo número real da Sala Rosa
+const WHATSAPP_NUMBER = '5518996072075' // TODO: trocar pelo número real da consultora
 const WHATSAPP_MSG = encodeURIComponent(
-  'Olá! Tenho interesse em ser consultora da Sala Rosa. Poderia me enviar mais informações?'
+  'Olá! Tenho interesse em falar com uma consultora Mary Kay. Poderia me enviar mais informações?'
 )
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`
 
@@ -121,7 +121,7 @@ export default function HomePage() {
             Sala Rosa
           </h1>
           <p className="text-lg text-white/80 mb-10 leading-relaxed font-body max-w-xl mx-auto">
-            Um espaço exclusivo de beleza, bem-estar e cuidado feminino. Agende
+            Um espaço exclusivo de beleza, bem-estar e cuidados. Agende
             seu atendimento e descubra uma nova versão de você.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -137,7 +137,7 @@ export default function HomePage() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-lg font-medium hover:bg-white/10 transition-colors"
             >
-              <MessageCircle size={16} /> Quero ser consultora
+              <MessageCircle size={16} /> Falar com consultora
             </a>
           </div>
         </div>
@@ -214,12 +214,12 @@ export default function HomePage() {
         <div className="max-w-3xl mx-auto text-center">
           <Clock size={40} className="text-primary-foreground mx-auto mb-6 opacity-80" />
           <h2 className="font-sans text-4xl font-bold text-primary-foreground mb-4 text-balance">
-            Quer fazer parte do time?
+            Precisa de ajuda para escolher?
           </h2>
           <p className="text-primary-foreground/80 mb-8 text-lg font-body leading-relaxed">
-            Torne-se uma consultora da Sala Rosa e tenha acesso a treinamentos
-            exclusivos, produtos com desconto e uma comunidade de mulheres
-            incríveis.
+            Fale com uma consultora Mary Kay e receba uma orientação
+            personalizada sobre produtos, tons de base e modo de uso ideal para
+            a sua rotina.
           </p>
           <a
             href={WHATSAPP_URL}
@@ -227,7 +227,7 @@ export default function HomePage() {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-white text-primary px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
-            <MessageCircle size={18} /> Quero ser consultora
+            <MessageCircle size={18} /> Falar com consultora
           </a>
         </div>
       </section>
