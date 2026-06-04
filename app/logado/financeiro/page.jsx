@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { formatCurrency, formatDate, exportCSV } from '@/utils/helpers'
 import { useRelatorio } from '@/components/Relatorios'
+import HelpTour from '@/components/HelpTour'
 import { Loader2, Download, Wallet, X, TrendingUp, ShoppingBag, CalendarCheck, HelpCircle } from 'lucide-react'
 
 const STATUS_CONFIG = {
@@ -27,7 +28,15 @@ export default function FinanceiroPage() {
   const [filtroStatus, setFiltroStatus] = useState('')
   const [filtroInicio, setFiltroInicio] = useState('')
   const [filtroFim, setFiltroFim] = useState('')
-  const [ajudaAberta, setAjudaAberta] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const financeiroSteps = [
+    { selector: '#tour-financeiro-header', title: 'Financeiro', body: 'Aqui ficam os lançamentos de vendas e atendimentos, com status e valores recebidos.', tip: 'Use esta tela para conferir o que já entrou e o que ainda está pendente.' },
+    { selector: '#tour-financeiro-resumo', title: 'Resumo financeiro', body: 'Os cards mostram total recebido, valores a receber, vendas pagas e atendimentos pagos.' },
+    { selector: '#tour-financeiro-filtros', title: 'Filtros', body: 'Filtre por status ou intervalo de datas para investigar períodos específicos.' },
+    { selector: '#tour-financeiro-lista', title: 'Lançamentos', body: 'A lista mostra cada registro financeiro e permite marcar pagamentos pendentes como pagos.' },
+  ]
 
   async function fetchFinanceiro() {
     setLoading(true)
@@ -82,7 +91,7 @@ export default function FinanceiroPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div id="tour-financeiro-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">Financeiro</h1>
           <p className="text-muted-foreground font-body mt-1 text-sm">
@@ -91,7 +100,7 @@ export default function FinanceiroPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setAjudaAberta(true)}
+            onClick={() => { setTourIndex(0); setTourAtivo(true) }}
             className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
           >
             <HelpCircle size={16} /> Ajuda
@@ -106,7 +115,7 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Cards resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div id="tour-financeiro-resumo" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp size={14} className="text-primary" />
@@ -157,7 +166,7 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-card border border-border rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-end">
+      <div id="tour-financeiro-filtros" className="bg-card border border-border rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-end">
         <div>
           <label className="block text-xs font-body text-muted-foreground mb-1">Status</label>
           <select
@@ -201,6 +210,7 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Lista */}
+      <div id="tour-financeiro-lista">
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={32} className="animate-spin text-primary" />
@@ -348,24 +358,16 @@ export default function FinanceiroPage() {
           ════════════════════════════════════════════════════════════ */}
         </>
       )}
+      </div>
 
-      {ajudaAberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-sans text-lg font-bold">Ajuda - Financeiro</h3>
-              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground font-body">
-              <p><strong className="text-foreground">Resumo:</strong> os cards mostram recebido, pendente, vendas e atendimentos.</p>
-              <p><strong className="text-foreground">Filtros:</strong> refine por status e período para conferir movimentos específicos.</p>
-              <p><strong className="text-foreground">Pagamento:</strong> registros pendentes podem ser marcados como pagos na lista.</p>
-              <p><strong className="text-foreground">Relatório:</strong> exporta apenas os valores pagos para conferência.</p>
-            </div>
-          </div>
-        </div>
+      {tourAtivo && (
+        <HelpTour
+          steps={financeiroSteps}
+          index={tourIndex}
+          onNext={() => tourIndex === financeiroSteps.length - 1 ? setTourAtivo(false) : setTourIndex(tourIndex + 1)}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
       )}
     </div>
   )

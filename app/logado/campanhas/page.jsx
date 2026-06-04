@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { toast } from 'sonner'
+import HelpTour from '@/components/HelpTour'
 import {
   CheckCircle2,
   HelpCircle,
@@ -39,7 +40,8 @@ export default function CampanhasPage() {
   const [loading, setLoading] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
-  const [ajudaAberta, setAjudaAberta] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
   const [imagemArquivo, setImagemArquivo] = useState(null)
   const [imagemPreview, setImagemPreview] = useState('')
   const [form, setForm] = useState({
@@ -48,6 +50,13 @@ export default function CampanhasPage() {
     mensagem: '',
     imagemUrl: '',
   })
+
+  const campanhasSteps = [
+    { selector: '#tour-campanhas-header', title: 'Campanhas de email', body: 'Nesta aba você cria envios por email para promoções, datas comemorativas e comunicados.' },
+    { selector: '#tour-campanhas-editor', title: 'Conteúdo da campanha', body: 'Preencha título interno, assunto, mensagem e imagem opcional.', tip: 'Use {{nome}} para personalizar o texto com o nome da cliente.' },
+    { selector: '#tour-campanhas-destinatarios', title: 'Destinatários', body: 'Escolha clientes específicos ou marque todos os clientes com email cadastrado.' },
+    { selector: '#tour-campanhas-historico', title: 'Histórico', body: 'Aqui ficam as campanhas recentes e o resumo do último envio.' },
+  ]
 
   async function carregar() {
     setLoading(true)
@@ -140,7 +149,7 @@ export default function CampanhasPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div id="tour-campanhas-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">Campanhas</h1>
           <p className="text-muted-foreground font-body mt-1 text-sm">
@@ -149,7 +158,7 @@ export default function CampanhasPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setAjudaAberta(true)}
+            onClick={() => { setTourIndex(0); setTourAtivo(true) }}
             className="inline-flex items-center gap-2 border border-border px-4 py-2.5 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
           >
             <HelpCircle size={16} /> Ajuda
@@ -165,7 +174,7 @@ export default function CampanhasPage() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)] gap-6">
-        <form onSubmit={handleEnviar} className="bg-card border border-border rounded-xl p-5 flex flex-col gap-5">
+        <form id="tour-campanhas-editor" onSubmit={handleEnviar} className="bg-card border border-border rounded-xl p-5 flex flex-col gap-5">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Mail size={18} />
@@ -240,7 +249,7 @@ export default function CampanhasPage() {
             </div>
           )}
 
-          <div className="border border-border rounded-xl p-4 bg-muted/20">
+          <div id="tour-campanhas-destinatarios" className="border border-border rounded-xl p-4 bg-muted/20">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <Users size={16} className="text-primary" />
@@ -311,7 +320,7 @@ export default function CampanhasPage() {
           </div>
         </form>
 
-        <aside className="flex flex-col gap-6">
+        <aside id="tour-campanhas-historico" className="flex flex-col gap-6">
           {resultado && (
             <div className="bg-card border border-border rounded-xl p-5">
               <h2 className="font-sans text-lg font-bold mb-3">Último envio</h2>
@@ -355,23 +364,14 @@ export default function CampanhasPage() {
         </aside>
       </div>
 
-      {ajudaAberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-sans text-lg font-bold">Ajuda - Campanhas</h3>
-              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground font-body">
-              <p><strong className="text-foreground">Nova campanha:</strong> preencha título interno, assunto e mensagem do email.</p>
-              <p><strong className="text-foreground">Personalização:</strong> use {'{{nome}}'} para chamar cada cliente pelo nome.</p>
-              <p><strong className="text-foreground">Destinatários:</strong> escolha clientes específicos ou envie para todos os clientes com email.</p>
-              <p><strong className="text-foreground">Imagem:</strong> use uma URL ou envie um arquivo para acompanhar a campanha.</p>
-            </div>
-          </div>
-        </div>
+      {tourAtivo && (
+        <HelpTour
+          steps={campanhasSteps}
+          index={tourIndex}
+          onNext={() => tourIndex === campanhasSteps.length - 1 ? setTourAtivo(false) : setTourIndex(tourIndex + 1)}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
       )}
     </div>
   )

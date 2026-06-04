@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { toast } from 'sonner'
+import HelpTour from '@/components/HelpTour'
 import {
   Loader2,
   AlertTriangle,
@@ -92,7 +93,28 @@ export default function EstoquePage() {
   const [loadingProdutos, setLoadingProdutos] = useState(true)
   const [loadingMovimentacoes, setLoadingMovimentacoes] = useState(true)
   const [movModal, setMovModal] = useState(null)
-  const [ajudaAberta, setAjudaAberta] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const estoqueSteps = [
+    {
+      selector: '#tour-estoque-header',
+      title: 'Controle de estoque',
+      body: 'Aqui você acompanha produtos cadastrados, níveis de estoque e o histórico de movimentações.',
+      tip: 'Use esta tela para saber quando precisa repor produtos.',
+    },
+    {
+      selector: '#tour-estoque-abas',
+      title: 'Produtos e movimentações',
+      body: 'Alterne entre a lista de produtos em estoque e o histórico de entradas, saídas e ajustes.',
+    },
+    {
+      selector: '#tour-estoque-conteudo',
+      title: 'Lista principal',
+      body: 'Nesta área ficam os produtos com estoque atual, mínimo, preço e ações para movimentar.',
+      tip: 'Produtos críticos aparecem destacados quando ficam abaixo do mínimo.',
+    },
+  ]
 
   async function fetchProdutos() {
     setLoadingProdutos(true)
@@ -156,13 +178,13 @@ export default function EstoquePage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div id="tour-estoque-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">Estoque</h1>
           <p className="text-muted-foreground font-body mt-1 text-sm">Controle de produtos e movimentações</p>
         </div>
         <button
-          onClick={() => setAjudaAberta(true)}
+          onClick={() => { setTourIndex(0); setTourAtivo(true) }}
           className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
         >
           <HelpCircle size={16} /> Ajuda
@@ -170,7 +192,7 @@ export default function EstoquePage() {
       </div>
 
       {/* Abas */}
-      <div className="flex items-center gap-2 mb-6 border-b border-border">
+      <div id="tour-estoque-abas" className="flex items-center gap-2 mb-6 border-b border-border">
         <button
           onClick={() => setAba('produtos')}
           className={`px-4 py-2 text-sm font-body border-b-2 transition-colors ${aba === 'produtos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
@@ -186,6 +208,7 @@ export default function EstoquePage() {
       </div>
 
       {/* ── ABA PRODUTOS ─────────────────────────────────────────────────── */}
+      <div id="tour-estoque-conteudo">
       {aba === 'produtos' && (
         <>
           {produtos.filter((p) => situacao(p).label !== 'Normal').length > 0 && (
@@ -303,6 +326,7 @@ export default function EstoquePage() {
           )}
         </>
       )}
+      </div>
 
       {/* ── ABA MOVIMENTAÇÕES ─────────────────────────────────────────────── */}
       {aba === 'movimentacoes' && (
@@ -406,23 +430,14 @@ export default function EstoquePage() {
         <MovimentacaoModal produto={movModal} onClose={() => setMovModal(null)} onSalvo={atualizarTudo} />
       )}
 
-      {ajudaAberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-sans text-lg font-bold">Ajuda - Estoque</h3>
-              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground font-body">
-              <p><strong className="text-foreground">Produtos:</strong> mostra quantidade atual, mínimo, preço e situação do estoque.</p>
-              <p><strong className="text-foreground">Alertas:</strong> produtos críticos aparecem quando estão abaixo ou no mínimo configurado.</p>
-              <p><strong className="text-foreground">Movimentar:</strong> registre entrada, saída ou ajuste manual de estoque.</p>
-              <p><strong className="text-foreground">Movimentações:</strong> histórico de tudo que entrou, saiu ou foi ajustado.</p>
-            </div>
-          </div>
-        </div>
+      {tourAtivo && (
+        <HelpTour
+          steps={estoqueSteps}
+          index={tourIndex}
+          onNext={() => tourIndex === estoqueSteps.length - 1 ? setTourAtivo(false) : setTourIndex(tourIndex + 1)}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
       )}
     </div>
   )

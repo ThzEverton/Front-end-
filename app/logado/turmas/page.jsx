@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { useUser } from '@/context/userContext'
 import { toast } from 'sonner'
+import HelpTour from '@/components/HelpTour'
 import {
   Loader2,
   Users,
@@ -906,7 +907,14 @@ export default function TurmasPage() {
   const [loading, setLoading] = useState(true)
   const [detalhesId, setDetalhesId] = useState(null)
   const [showCodigo, setShowCodigo] = useState(false)
-  const [ajudaAberta, setAjudaAberta] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const turmasSteps = [
+    { selector: '#tour-turmas-header', title: 'Turmas', body: isGerente ? 'Aqui você gerencia turmas, aprova solicitações e acompanha participantes.' : 'Aqui você vê turmas abertas e entra usando aprovação ou código.' },
+    { selector: '#tour-turmas-conteudo', title: 'Cards de turma', body: 'Cada card mostra serviço, data, horário, status e quantidade de participantes.' },
+    { selector: '#tour-turmas-acoes', title: 'Ações', body: isGerente ? 'Use os botões para aprovar, recusar, copiar código ou abrir detalhes.' : 'Use os botões para entrar, sair ou informar um código de convite.', tip: 'O botão Ver detalhes abre a lista de participantes e informações completas.' },
+  ]
 
   async function fetchTurmas() {
     setLoading(true)
@@ -1007,7 +1015,7 @@ export default function TurmasPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div id="tour-turmas-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">Turmas</h1>
           <p className="text-muted-foreground font-body mt-1 text-sm">
@@ -1015,9 +1023,9 @@ export default function TurmasPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div id="tour-turmas-acoes" className="flex items-center gap-2">
           <button
-            onClick={() => setAjudaAberta(true)}
+            onClick={() => { setTourIndex(0); setTourAtivo(true) }}
             className="flex items-center gap-2 text-sm border border-border px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground self-start sm:self-auto"
           >
             <HelpCircle size={15} />
@@ -1036,7 +1044,9 @@ export default function TurmasPage() {
         </div>
       </div>
 
-      {renderConteudo()}
+      <div id="tour-turmas-conteudo">
+        {renderConteudo()}
+      </div>
 
       {detalhesId && (
         <DetalhesTurmaModal
@@ -1054,32 +1064,14 @@ export default function TurmasPage() {
         />
       )}
 
-      {ajudaAberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-sans text-lg font-bold">Ajuda - Turmas</h3>
-              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground font-body">
-              <p><strong className="text-foreground">Lista:</strong> cada card mostra serviço, data, horário, status e participantes.</p>
-              {isGerente ? (
-                <>
-                  <p><strong className="text-foreground">Aprovação:</strong> turmas pendentes podem ser aprovadas ou recusadas.</p>
-                  <p><strong className="text-foreground">Código:</strong> copie o convite para enviar aos clientes.</p>
-                  <p><strong className="text-foreground">Detalhes:</strong> veja participantes e edite informações da turma.</p>
-                </>
-              ) : (
-                <>
-                  <p><strong className="text-foreground">Participar:</strong> entre em turmas aprovadas ou use um código de convite.</p>
-                  <p><strong className="text-foreground">Sair:</strong> caso esteja participando, use o botão sair no card.</p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      {tourAtivo && (
+        <HelpTour
+          steps={turmasSteps}
+          index={tourIndex}
+          onNext={() => tourIndex === turmasSteps.length - 1 ? setTourAtivo(false) : setTourIndex(tourIndex + 1)}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
       )}
     </div>
   )

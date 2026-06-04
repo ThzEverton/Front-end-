@@ -6,6 +6,7 @@ import { useUser } from '@/context/userContext'
 import apiClient from '@/utils/apiClient'
 import { formatCurrency, todayISO, statusAgendamentoLabel } from '@/utils/helpers'
 import { toast } from 'sonner'
+import HelpTour from '@/components/HelpTour'
 import {
   CalendarDays,
   ShoppingCart,
@@ -16,7 +17,6 @@ import {
   ChevronRight,
   Clock3,
   HelpCircle,
-  X,
 } from 'lucide-react'
 
 function erroApi(error, fallback) {
@@ -294,7 +294,13 @@ export default function DashboardPage() {
   const [financeiro, setFinanceiro] = useState([])
   const [slots, setSlots] = useState([])
   const [loadingAll, setLoadingAll] = useState(true)
-  const [ajudaAberta, setAjudaAberta] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const dashboardSteps = [
+    { selector: '#tour-dashboard-header', title: 'Dashboard', body: 'Esta é a visão rápida do dia para você acompanhar o que precisa de atenção.' },
+    { selector: '#tour-dashboard-conteudo', title: 'Resumo principal', body: isGerente ? 'Veja agenda de hoje, vendas, estoque em alerta e receita do mês.' : 'Veja seus próximos agendamentos e horários disponíveis.', tip: 'Os blocos e links levam direto para as áreas mais usadas do sistema.' },
+  ]
 
   useEffect(() => {
     async function fetchAll() {
@@ -355,7 +361,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div id="tour-dashboard-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">
             Olá, {user?.nome?.split(' ')[0] || 'bem-vinda'}!
@@ -365,55 +371,40 @@ export default function DashboardPage() {
           </p>
         </div>
         <button
-          onClick={() => setAjudaAberta(true)}
+          onClick={() => { setTourIndex(0); setTourAtivo(true) }}
           className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors self-start sm:self-auto"
         >
           <HelpCircle size={16} /> Ajuda
         </button>
       </div>
 
-      {isGerente ? (
-        <DashboardGerente
-          loadingAll={loadingAll}
-          agendamentosHoje={agendamentosHoje}
-          vendas={vendas}
-          produtos={produtos}
-          financeiro={financeiro}
-          hoje={hoje}
-        />
-      ) : (
-        <DashboardCliente
-          loadingAll={loadingAll}
-          agendamentosHoje={agendamentosHoje}
-          slots={slots}
-        />
-      )}
+      <div id="tour-dashboard-conteudo">
+        {isGerente ? (
+          <DashboardGerente
+            loadingAll={loadingAll}
+            agendamentosHoje={agendamentosHoje}
+            vendas={vendas}
+            produtos={produtos}
+            financeiro={financeiro}
+            hoje={hoje}
+          />
+        ) : (
+          <DashboardCliente
+            loadingAll={loadingAll}
+            agendamentosHoje={agendamentosHoje}
+            slots={slots}
+          />
+        )}
+      </div>
 
-      {ajudaAberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-sans text-lg font-bold">Ajuda - Dashboard</h3>
-              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground font-body">
-              <p><strong className="text-foreground">Resumo do dia:</strong> mostra os principais números para começar o atendimento.</p>
-              {isGerente ? (
-                <>
-                  <p><strong className="text-foreground">Cards:</strong> acompanhe agenda, vendas, estoque crítico e receita do mês.</p>
-                  <p><strong className="text-foreground">Listas rápidas:</strong> veja próximos agendamentos, estoque em alerta e vendas recentes.</p>
-                </>
-              ) : (
-                <>
-                  <p><strong className="text-foreground">Agendamentos:</strong> acompanhe seus horários próximos.</p>
-                  <p><strong className="text-foreground">Horários:</strong> veja atalhos para encontrar horários disponíveis.</p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      {tourAtivo && (
+        <HelpTour
+          steps={dashboardSteps}
+          index={tourIndex}
+          onNext={() => tourIndex === dashboardSteps.length - 1 ? setTourAtivo(false) : setTourIndex(tourIndex + 1)}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
       )}
     </div>
   )

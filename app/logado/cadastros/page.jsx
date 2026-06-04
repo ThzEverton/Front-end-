@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useUser } from '@/context/userContext'
 import apiClient from '@/utils/apiClient'
 import { toast } from 'sonner'
+import HelpTour from '@/components/HelpTour'
 import {
   Loader2,
   Plus,
@@ -1449,7 +1450,14 @@ function ProdutoSimpleModal({ produto, onClose, onSalvo }) {
 export default function CadastrosPage() {
   const { isGerente } = useUser()
   const [aba, setAba] = useState('usuarios')
-  const [ajudaAberta, setAjudaAberta] = useState(false)
+  const [tourAtivo, setTourAtivo] = useState(false)
+  const [tourIndex, setTourIndex] = useState(0)
+
+  const cadastrosSteps = [
+    { selector: '#tour-cadastros-header', title: 'Cadastros', body: 'Aqui ficam os cadastros base usados por agenda, vendas, estoque e financeiro.' },
+    { selector: '#tour-cadastros-abas', title: 'Abas de cadastro', body: 'Alterne entre usuários, serviços, produtos e configurações de agenda.' },
+    { selector: '#tour-cadastros-conteudo', title: 'Conteúdo da aba', body: 'Nesta área você lista, cria e edita os dados da aba selecionada.', tip: 'Cadastre serviços antes de liberar horários para agendamento.' },
+  ]
 
   const tabContent = {
     usuarios: <UsuariosTab />,
@@ -1468,7 +1476,7 @@ export default function CadastrosPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div id="tour-cadastros-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-sans text-3xl font-bold text-foreground">Cadastros</h1>
           <p className="text-muted-foreground font-body mt-1 text-sm">
@@ -1476,14 +1484,14 @@ export default function CadastrosPage() {
           </p>
         </div>
         <button
-          onClick={() => setAjudaAberta(true)}
+          onClick={() => { setTourIndex(0); setTourAtivo(true) }}
           className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors self-start sm:self-auto"
         >
           <HelpCircle size={16} /> Ajuda
         </button>
       </div>
 
-      <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+      <div id="tour-cadastros-abas" className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
         {ABAS.map((a) => (
           <button
             key={a.key}
@@ -1500,27 +1508,18 @@ export default function CadastrosPage() {
         ))}
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-5 animate-fade-in">
+      <div id="tour-cadastros-conteudo" className="bg-card border border-border rounded-xl p-5 animate-fade-in">
         {tabContent[aba]}
       </div>
 
-      {ajudaAberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-sans text-lg font-bold">Ajuda - Cadastros</h3>
-              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground font-body">
-              <p><strong className="text-foreground">Usuários:</strong> cadastre clientes, gerentes e consultoras.</p>
-              <p><strong className="text-foreground">Serviços:</strong> defina nome, preço, duração e visibilidade para consultora.</p>
-              <p><strong className="text-foreground">Produtos:</strong> cadastre itens vendidos e controle estoque inicial/mínimo.</p>
-              <p><strong className="text-foreground">Agenda:</strong> ajuste slots e configurações usadas pelos horários disponíveis.</p>
-            </div>
-          </div>
-        </div>
+      {tourAtivo && (
+        <HelpTour
+          steps={cadastrosSteps}
+          index={tourIndex}
+          onNext={() => tourIndex === cadastrosSteps.length - 1 ? setTourAtivo(false) : setTourIndex(tourIndex + 1)}
+          onPrev={() => setTourIndex(tourIndex - 1)}
+          onStop={() => setTourAtivo(false)}
+        />
       )}
     </div>
   )
