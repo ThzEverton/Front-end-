@@ -49,11 +49,13 @@ export default function CampanhasPage() {
     assunto: '',
     mensagem: '',
     imagemUrl: '',
+    incluirServicos: false,
   })
 
   const campanhasSteps = [
     { selector: '#tour-campanhas-header', title: 'Campanhas de email', body: 'Nesta aba você cria envios por email para promoções, datas comemorativas e comunicados.' },
     { selector: '#tour-campanhas-editor', title: 'Conteúdo da campanha', body: 'Preencha título interno, assunto, mensagem e imagem opcional.', tip: 'Use {{nome}} para personalizar o texto com o nome da cliente.' },
+    { selector: '#tour-campanhas-opcoes', title: 'Opções do email', body: 'Escolha se esta campanha deve mostrar o bloco institucional de serviços. Por padrão ele fica desligado.' },
     { selector: '#tour-campanhas-destinatarios', title: 'Destinatários', body: 'Escolha clientes específicos ou marque todos os clientes com email cadastrado.' },
     { selector: '#tour-campanhas-historico', title: 'Histórico', body: 'Aqui ficam as campanhas recentes e o resumo do último envio.' },
   ]
@@ -134,7 +136,7 @@ export default function CampanhasPage() {
       const resp = await apiClient.post('/email-campanhas/enviar', payload)
       setResultado(resp)
       toast.success(`Campanha enviada: ${resp.enviados || 0} email(s).`)
-      setForm({ titulo: '', assunto: '', mensagem: '', imagemUrl: '' })
+      setForm({ titulo: '', assunto: '', mensagem: '', imagemUrl: '', incluirServicos: false })
       setSelecionados([])
       setTodosClientes(false)
       setImagemArquivo(null)
@@ -249,6 +251,23 @@ export default function CampanhasPage() {
             </div>
           )}
 
+          <div id="tour-campanhas-opcoes" className="border border-border rounded-xl p-4 bg-muted/20">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.incluirServicos}
+                onChange={(e) => setForm({ ...form, incluirServicos: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-ring"
+              />
+              <span>
+                <span className="block text-sm font-medium font-body text-foreground">Mostrar bloco de serviços no email</span>
+                <span className="block text-xs text-muted-foreground font-body mt-1">
+                  Use apenas quando a campanha também precisar reforçar a apresentação da Sala Rosa. O padrão é enviar sem esse bloco.
+                </span>
+              </span>
+            </label>
+          </div>
+
           <div id="tour-campanhas-destinatarios" className="border border-border rounded-xl p-4 bg-muted/20">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
@@ -354,6 +373,7 @@ export default function CampanhasPage() {
                     <div className="flex flex-wrap gap-2 mt-2 text-[11px] font-body text-muted-foreground">
                       <span>{campanha.totalEnviados} enviados</span>
                       <span>{campanha.totalErros} erros</span>
+                      {campanha.incluirServicos && <span>com bloco de serviços</span>}
                       <span>{formatDateTime(campanha.ultimoEnvioEm)}</span>
                     </div>
                   </div>
