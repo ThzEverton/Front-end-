@@ -50,12 +50,13 @@ export default function CampanhasPage() {
     mensagem: '',
     imagemUrl: '',
     incluirServicos: false,
+    personalizarHistorico: false,
   })
 
   const campanhasSteps = [
     { selector: '#tour-campanhas-header', title: 'Campanhas de email', body: 'Nesta aba você cria envios por email para promoções, datas comemorativas e comunicados.' },
     { selector: '#tour-campanhas-editor', title: 'Conteúdo da campanha', body: 'Preencha título interno, assunto, mensagem e imagem opcional.', tip: 'Use {{nome}} para personalizar o texto com o nome da cliente.' },
-    { selector: '#tour-campanhas-opcoes', title: 'Opções do email', body: 'Escolha se esta campanha deve mostrar o bloco institucional de serviços. Por padrão ele fica desligado.' },
+    { selector: '#tour-campanhas-opcoes', title: 'Opções do email', body: 'Escolha se esta campanha deve mostrar o bloco institucional de serviços ou personalizar pelo histórico da cliente. Por padrão essas opções ficam desligadas.' },
     { selector: '#tour-campanhas-destinatarios', title: 'Destinatários', body: 'Escolha clientes específicos ou marque todos os clientes com email cadastrado.' },
     { selector: '#tour-campanhas-historico', title: 'Histórico', body: 'Aqui ficam as campanhas recentes e o resumo do último envio.' },
   ]
@@ -136,7 +137,7 @@ export default function CampanhasPage() {
       const resp = await apiClient.post('/email-campanhas/enviar', payload)
       setResultado(resp)
       toast.success(`Campanha enviada: ${resp.enviados || 0} email(s).`)
-      setForm({ titulo: '', assunto: '', mensagem: '', imagemUrl: '', incluirServicos: false })
+      setForm({ titulo: '', assunto: '', mensagem: '', imagemUrl: '', incluirServicos: false, personalizarHistorico: false })
       setSelecionados([])
       setTodosClientes(false)
       setImagemArquivo(null)
@@ -266,6 +267,20 @@ export default function CampanhasPage() {
                 </span>
               </span>
             </label>
+            <label className="flex items-start gap-3 cursor-pointer mt-4 pt-4 border-t border-border">
+              <input
+                type="checkbox"
+                checked={form.personalizarHistorico}
+                onChange={(e) => setForm({ ...form, personalizarHistorico: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-ring"
+              />
+              <span>
+                <span className="block text-sm font-medium font-body text-foreground">Personalizar por histórico da cliente</span>
+                <span className="block text-xs text-muted-foreground font-body mt-1">
+                  Mostra um destaque individual apenas quando a cliente tiver compras ou atendimentos repetidos no histórico. Se não tiver confiança, o email vai normal.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div id="tour-campanhas-destinatarios" className="border border-border rounded-xl p-4 bg-muted/20">
@@ -343,7 +358,7 @@ export default function CampanhasPage() {
           {resultado && (
             <div className="bg-card border border-border rounded-xl p-5">
               <h2 className="font-sans text-lg font-bold mb-3">Último envio</h2>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-muted/40 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground font-body">Total</p>
                   <p className="font-sans text-xl font-bold">{resultado.total}</p>
@@ -355,6 +370,10 @@ export default function CampanhasPage() {
                 <div className="bg-red-50 rounded-lg p-3">
                   <p className="text-xs text-red-700 font-body">Erros</p>
                   <p className="font-sans text-xl font-bold text-red-700">{resultado.erros}</p>
+                </div>
+                <div className="bg-primary/10 rounded-lg p-3">
+                  <p className="text-xs text-primary font-body">Personalizados</p>
+                  <p className="font-sans text-xl font-bold text-primary">{resultado.personalizados || 0}</p>
                 </div>
               </div>
             </div>
@@ -374,6 +393,7 @@ export default function CampanhasPage() {
                       <span>{campanha.totalEnviados} enviados</span>
                       <span>{campanha.totalErros} erros</span>
                       {campanha.incluirServicos && <span>com bloco de serviços</span>}
+                      {campanha.personalizarHistorico && <span>personalizado por histórico</span>}
                       <span>{formatDateTime(campanha.ultimoEnvioEm)}</span>
                     </div>
                   </div>
