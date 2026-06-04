@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import apiClient from '@/utils/apiClient'
 import { formatCurrency, formatDate, exportCSV } from '@/utils/helpers'
 import { useRelatorio } from '@/components/Relatorios'
-import { Loader2, Download, Wallet, X, TrendingUp, ShoppingBag, CalendarCheck } from 'lucide-react'
+import { Loader2, Download, Wallet, X, TrendingUp, ShoppingBag, CalendarCheck, HelpCircle } from 'lucide-react'
 
 const STATUS_CONFIG = {
   pago:      { label: 'Pago',      cls: 'bg-green-100 text-green-700' },
@@ -27,6 +27,7 @@ export default function FinanceiroPage() {
   const [filtroStatus, setFiltroStatus] = useState('')
   const [filtroInicio, setFiltroInicio] = useState('')
   const [filtroFim, setFiltroFim] = useState('')
+  const [ajudaAberta, setAjudaAberta] = useState(false)
 
   async function fetchFinanceiro() {
     setLoading(true)
@@ -88,12 +89,20 @@ export default function FinanceiroPage() {
             Receitas de vendas e atendimentos da Sala Rosa
           </p>
         </div>
-        <button
-          onClick={handleExportCSV}
-          className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors"
-        >
-          <Download size={16} /> Exportar CSV (pagos)
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAjudaAberta(true)}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <HelpCircle size={16} /> Ajuda
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body hover:bg-muted transition-colors"
+          >
+            <Download size={16} /> Exportar CSV (pagos)
+          </button>
+        </div>
       </div>
 
       {/* Cards resumo */}
@@ -338,6 +347,25 @@ export default function FinanceiroPage() {
               FIM VERSÃO DESKTOP
           ════════════════════════════════════════════════════════════ */}
         </>
+      )}
+
+      {ajudaAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-sans text-lg font-bold">Ajuda - Financeiro</h3>
+              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground font-body">
+              <p><strong className="text-foreground">Resumo:</strong> os cards mostram recebido, pendente, vendas e atendimentos.</p>
+              <p><strong className="text-foreground">Filtros:</strong> refine por status e período para conferir movimentos específicos.</p>
+              <p><strong className="text-foreground">Pagamento:</strong> registros pendentes podem ser marcados como pagos na lista.</p>
+              <p><strong className="text-foreground">Relatório:</strong> exporta apenas os valores pagos para conferência.</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

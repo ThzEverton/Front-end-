@@ -16,6 +16,7 @@ const FORMA_ICON = { dinheiro: Banknote, cartao: CreditCard, pix: QrCode }
 
 const STATUS_STYLE = {
   pendente: 'bg-yellow-100 text-yellow-700',
+  parcial: 'bg-blue-100 text-blue-700',
   pago: 'bg-green-100 text-green-700',
   cancelado: 'bg-red-100 text-red-700',
   estornado: 'bg-gray-100 text-gray-600',
@@ -170,6 +171,10 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
   const [loadingItens, setLoadingItens] = useState(false)
   const [formaPagto, setFormaPagto] = useState(venda?.formaPagto || '')
   const [statusPagto, setStatusPagto] = useState(venda?.statusPagto || 'pendente')
+  const [valorPago, setValorPago] = useState(Number(venda?.valorPago || 0))
+  const [parcelado, setParcelado] = useState(Boolean(venda?.parcelado))
+  const [qtdParcelas, setQtdParcelas] = useState(Number(venda?.qtdParcelas || 2))
+  const [valorParcela, setValorParcela] = useState(Number(venda?.valorParcela || 0))
   const [editandoPagto, setEditandoPagto] = useState(false)
   const [loadingSalvar, setLoadingSalvar] = useState(false)
   const [tourAtivo, setTourAtivo] = useState(false)
@@ -203,7 +208,14 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
   async function handleSalvarPagamento() {
     setLoadingSalvar(true)
     try {
-      await apiClient.patch(`/vendas/${venda.id}/pagamento`, { formaPagto, statusPagto })
+      await apiClient.patch(`/vendas/${venda.id}/pagamento`, {
+        formaPagto,
+        statusPagto,
+        valorPago: Number(valorPago || 0),
+        parcelado,
+        qtdParcelas: parcelado ? Number(qtdParcelas || 2) : 1,
+        valorParcela: parcelado ? Number(valorParcela || 0) : 0,
+      })
       toast.success('Pagamento atualizado com sucesso!')
       setEditandoPagto(false)
       onAtualizado?.()
@@ -215,8 +227,15 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
   }
 
   const data = venda?.data ? new Date(venda.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'
-  const pagamentoAlterado = formaPagto !== venda?.formaPagto || statusPagto !== venda?.statusPagto
   const valorTotal = venda?.valorTotal ?? venda?.total
+  const valorRestante = Math.max(Number(valorTotal || 0) - Number(valorPago || 0), 0)
+  const pagamentoAlterado =
+    formaPagto !== venda?.formaPagto ||
+    statusPagto !== venda?.statusPagto ||
+    Number(valorPago || 0) !== Number(venda?.valorPago || 0) ||
+    parcelado !== Boolean(venda?.parcelado) ||
+    Number(qtdParcelas || 1) !== Number(venda?.qtdParcelas || 1) ||
+    Number(valorParcela || 0) !== Number(venda?.valorParcela || 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
@@ -247,8 +266,9 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
             <div id="tour-status-detalhe" className="bg-muted/40 rounded-xl p-3">
               <p className="text-xs text-muted-foreground font-body mb-1">Status</p>
               {editandoPagto ? (
-                <select value={statusPagto} onChange={e => setStatusPagto(e.target.value)} className="w-full border border-input rounded-lg px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body">
+                <select value={statusPagto} onChange={e => { const novo = e.target.value; setStatusPagto(novo); if (novo === 'pago') setValorPago(Number(valorTotal || 0)); if (novo === 'pendente') setValorPago(0) }} className="w-full border border-input rounded-lg px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body">
                   <option value="pendente">Pendente</option>
+                  <option value="parcial">Parcial</option>
                   <option value="pago">Pago</option>
                   <option value="cancelado">Cancelado</option>
                   <option value="estornado">Estornado</option>
@@ -263,6 +283,35 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
               <p className="text-xs text-muted-foreground font-body mb-1">Total</p>
               <p id="tour-total-detalhe" className="text-sm font-bold text-primary font-sans">{formatCurrency(valorTotal)}</p>
             </div>
+            <div className="bg-muted/40 rounded-xl p-3">
+              <p className="text-xs text-muted-foreground font-body mb-1">Valor pago</p>
+              {editandoPagto ? (
+                <input type="number" min="0" step="0.01" value={valorPago} onChange={e => setValorPago(e.target.value)} className="w-full border border-input rounded-lg px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
+              ) : (
+                <p className="text-sm font-medium font-body">{formatCurrency(venda?.valorPago || 0)}</p>
+              )}
+            </div>
+            <div className="bg-muted/40 rounded-xl p-3">
+              <p className="text-xs text-muted-foreground font-body mb-1">Restante</p>
+              <p className="text-sm font-medium font-body">{formatCurrency(editandoPagto ? valorRestante : venda?.valorRestante || 0)}</p>
+            </div>
+            <div className="bg-muted/40 rounded-xl p-3 col-span-2">
+              <p className="text-xs text-muted-foreground font-body mb-2">Parcelamento</p>
+              {editandoPagto ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="inline-flex items-center gap-2 text-xs font-body">
+                    <input type="checkbox" checked={parcelado} onChange={e => setParcelado(e.target.checked)} />
+                    Parcelado
+                  </label>
+                  <input type="number" min="2" disabled={!parcelado} value={qtdParcelas} onChange={e => setQtdParcelas(e.target.value)} className="border border-input rounded-lg px-2 py-1.5 text-xs bg-background disabled:opacity-50 font-body" placeholder="Parcelas" />
+                  <input type="number" min="0" step="0.01" disabled={!parcelado} value={valorParcela} onChange={e => setValorParcela(e.target.value)} className="border border-input rounded-lg px-2 py-1.5 text-xs bg-background disabled:opacity-50 font-body" placeholder="Valor/parcela" />
+                </div>
+              ) : (
+                <p className="text-sm font-medium font-body">
+                  {venda?.parcelado ? `${venda.qtdParcelas}x de ${formatCurrency(venda.valorParcela)}` : 'Não parcelado'}
+                </p>
+              )}
+            </div>
           </div>
 
           {!editandoPagto ? (
@@ -271,7 +320,7 @@ function DetalheVendaModal({ venda, onClose, onAtualizado }) {
             </button>
           ) : (
             <div id="tour-atualizar-pagamento" className="flex gap-2">
-              <button onClick={() => { setEditandoPagto(false); setFormaPagto(venda?.formaPagto || ''); setStatusPagto(venda?.statusPagto || 'pendente') }} className="flex-1 border border-border rounded-lg py-2 text-xs font-body text-muted-foreground hover:bg-muted transition-colors">Cancelar</button>
+              <button onClick={() => { setEditandoPagto(false); setFormaPagto(venda?.formaPagto || ''); setStatusPagto(venda?.statusPagto || 'pendente'); setValorPago(Number(venda?.valorPago || 0)); setParcelado(Boolean(venda?.parcelado)); setQtdParcelas(Number(venda?.qtdParcelas || 2)); setValorParcela(Number(venda?.valorParcela || 0)) }} className="flex-1 border border-border rounded-lg py-2 text-xs font-body text-muted-foreground hover:bg-muted transition-colors">Cancelar</button>
               <button onClick={handleSalvarPagamento} disabled={loadingSalvar || !pagamentoAlterado} className="flex-1 bg-primary text-primary-foreground rounded-lg py-2 text-xs font-body hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5">
                 {loadingSalvar ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar
               </button>
@@ -360,6 +409,10 @@ function NovaVendaModal({ onClose, onSalvo }) {
   const [clienteId, setClienteId] = useState('')
   const [formaPagto, setFormaPagto] = useState('')
   const [statusPagto, setStatusPagto] = useState('pendente')
+  const [valorPago, setValorPago] = useState(0)
+  const [parcelado, setParcelado] = useState(false)
+  const [qtdParcelas, setQtdParcelas] = useState(2)
+  const [valorParcela, setValorParcela] = useState(0)
   const [observacao, setObservacao] = useState('')
   const [loading, setLoading] = useState(false)
   const [tourAtivo, setTourAtivo] = useState(false)
@@ -427,6 +480,7 @@ function NovaVendaModal({ onClose, onSalvo }) {
   }
 
   const subtotal = itens.reduce((acc, i) => acc + i.preco * i.quantidade, 0)
+  const valorRestante = Math.max(subtotal - Number(valorPago || 0), 0)
   const agendamentoSelecionado = agendamentos.find(a => String(a.id) === String(agendamentoId))
   const agendamentosFiltrados = agendamentos.filter(agendamento => {
     const termo = agendamentoBusca.trim().toLowerCase()
@@ -438,12 +492,19 @@ function NovaVendaModal({ onClose, onSalvo }) {
     e.preventDefault()
     if (itens.length === 0) { toast.error('Adicione pelo menos um item à venda.'); return }
     if (!formaPagto) { toast.error('Selecione a forma de pagamento.'); return }
+    if (Number(valorPago || 0) < 0) { toast.error('Valor pago não pode ser negativo.'); return }
+    if (Number(valorPago || 0) > subtotal) { toast.error('Valor pago não pode ser maior que o total.'); return }
+    if (parcelado && Number(qtdParcelas || 0) < 2) { toast.error('Informe ao menos 2 parcelas.'); return }
     if (vinculoTipo === 'agendamento' && !agendamentoId) { toast.error('Selecione o atendimento.'); return }
     if (vinculoTipo === 'cliente' && !clienteId) { toast.error('Selecione uma cliente.'); return }
 
     const payload = {
       formaPagto,
       statusPagto,
+      valorPago: Number(valorPago || 0),
+      parcelado,
+      qtdParcelas: parcelado ? Number(qtdParcelas || 2) : 1,
+      valorParcela: parcelado ? Number(valorParcela || 0) : 0,
       observacao: observacao || undefined,
       itens: itens.map(i => ({ tipo: i.tipo, id: i.id, nome: i.nome, quantidade: i.quantidade, preco: i.preco })),
       total: subtotal,
@@ -494,12 +555,36 @@ function NovaVendaModal({ onClose, onSalvo }) {
               </div>
               <div id="tour-status-pagamento">
                 <label className="block text-sm font-medium font-body mb-1.5">Status do pagamento</label>
-                <select value={statusPagto} onChange={e => setStatusPagto(e.target.value)} className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body">
+                <select value={statusPagto} onChange={e => { const novo = e.target.value; setStatusPagto(novo); if (novo === 'pago') setValorPago(subtotal); if (novo === 'pendente') setValorPago(0) }} className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body">
                   <option value="pendente">Pendente</option>
+                  <option value="parcial">Parcial</option>
                   <option value="pago">Pago</option>
                   <option value="cancelado">Cancelado</option>
                   <option value="estornado">Estornado</option>
                 </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">Valor pago</label>
+                <input type="number" min="0" step="0.01" value={valorPago} onChange={e => setValorPago(e.target.value)} className="w-full border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-body" />
+                <p className="text-xs text-muted-foreground font-body mt-1">Restante: {formatCurrency(valorRestante)}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium font-body mb-1.5">Parcelar</label>
+                <button type="button" onClick={() => setParcelado(v => !v)} className={`w-full border rounded-lg px-4 py-2.5 text-sm font-body transition-colors ${parcelado ? 'border-primary bg-primary/10 text-primary' : 'border-input text-muted-foreground hover:bg-muted'}`}>
+                  {parcelado ? 'Venda parcelada' : 'Sem parcelamento'}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium font-body mb-1.5">Parcelas</label>
+                  <input type="number" min="2" disabled={!parcelado} value={qtdParcelas} onChange={e => setQtdParcelas(e.target.value)} className="w-full border border-input rounded-lg px-3 py-2.5 text-sm bg-background disabled:opacity-50 font-body" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium font-body mb-1.5">Valor</label>
+                  <input type="number" min="0" step="0.01" disabled={!parcelado} value={valorParcela} onChange={e => setValorParcela(e.target.value)} className="w-full border border-input rounded-lg px-3 py-2.5 text-sm bg-background disabled:opacity-50 font-body" />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -748,6 +833,9 @@ export default function VendasPage() {
                   </span>
                   <FormaBadge forma={v?.formaPagto} />
                   <StatusBadge status={v?.statusPagto} />
+                  <span className="text-xs text-muted-foreground font-body">
+                    Pago {formatCurrency(v?.valorPago || 0)}
+                  </span>
                 </div>
 
                 {/* Botão ver detalhes */}
@@ -777,6 +865,8 @@ export default function VendasPage() {
                     <th className="px-4 py-3 font-medium">Itens</th>
                     <th id="col-pagamento" className="px-4 py-3 font-medium">Pagamento</th>
                     <th id="col-status" className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium text-right">Pago</th>
+                    <th className="px-4 py-3 font-medium text-right">Restante</th>
                     <th id="col-total" className="px-4 py-3 font-medium text-right">Total</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -796,6 +886,8 @@ export default function VendasPage() {
                       <td className="px-4 py-3 text-muted-foreground">{v?.itens?.length ?? '—'} item(s)</td>
                       <td className="px-4 py-3"><FormaBadge forma={v?.formaPagto} /></td>
                       <td className="px-4 py-3"><StatusBadge status={v?.statusPagto} /></td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(v?.valorPago || 0)}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(v?.valorRestante || 0)}</td>
                       <td className="px-4 py-3 text-right font-medium text-primary">{formatCurrency(v?.valorTotal ?? v?.total)}</td>
                       <td className="px-4 py-3 text-right"><Eye size={15} className="text-muted-foreground" /></td>
                     </tr>

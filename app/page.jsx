@@ -40,16 +40,16 @@ const beneficios = [
     desc: 'Espaço pensado para você se sentir em casa, com toda a exclusividade que merece.',
   },
   {
-    titulo: 'Equipe Especializada',
-    desc: 'Profissionais certificadas e em constante atualização para oferecer o melhor.',
+    titulo: 'Profissional Especializada',
+    desc: 'Atendimento feito por uma profissional certificada e em constante atualização para oferecer o melhor.',
   },
   {
     titulo: 'Agendamento Fácil',
     desc: 'Marque seu horário em minutos pelo nosso sistema online, 24 horas por dia.',
   },
   {
-    titulo: 'Mary Kay',
-    desc: 'Trabalhamos com a Mary Kay, marca renomada com mais de 62 anos de história no mercado da beleza.',
+    titulo: 'Produtos',
+    desc: 'Utilizamos produtos Mary Kay, marca renomada com mais de 62 anos de história no mercado da beleza.',
   },
 ]
 
@@ -93,7 +93,7 @@ function FaqItem({ q, a }) {
 
 const WHATSAPP_NUMBER = '5518996072075' // TODO: trocar pelo número real da consultora
 const WHATSAPP_MSG = encodeURIComponent(
-  'Olá! Tenho interesse em falar com uma consultora Mary Kay. Poderia me enviar mais informações?'
+  'Olá! Tenho interesse em ser uma consultora Mary Kay. Poderia me enviar mais informações?'
 )
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`
 
@@ -137,7 +137,7 @@ export default function HomePage() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-lg font-medium hover:bg-white/10 transition-colors"
             >
-              <MessageCircle size={16} /> Falar com consultora
+              <MessageCircle size={16} /> Quero ser consultora
             </a>
           </div>
         </div>
@@ -214,12 +214,11 @@ export default function HomePage() {
         <div className="max-w-3xl mx-auto text-center">
           <Clock size={40} className="text-primary-foreground mx-auto mb-6 opacity-80" />
           <h2 className="font-sans text-4xl font-bold text-primary-foreground mb-4 text-balance">
-            Precisa de ajuda para escolher?
+            Quer ser consultora Mary Kay?
           </h2>
           <p className="text-primary-foreground/80 mb-8 text-lg font-body leading-relaxed">
-            Fale com uma consultora Mary Kay e receba uma orientação
-            personalizada sobre produtos, tons de base e modo de uso ideal para
-            a sua rotina.
+            Receba mais informações para começar como consultora Mary Kay e
+            aprender sobre produtos, atendimento e modo de uso.
           </p>
           <a
             href={WHATSAPP_URL}
@@ -227,7 +226,7 @@ export default function HomePage() {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-white text-primary px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
-            <MessageCircle size={18} /> Falar com consultora
+            <MessageCircle size={18} /> Quero ser consultora
           </a>
         </div>
       </section>

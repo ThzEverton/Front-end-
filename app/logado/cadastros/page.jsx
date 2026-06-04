@@ -17,6 +17,7 @@ import {
   Cake,
   MessageCircle,
   FileText,
+  HelpCircle,
 } from 'lucide-react'
 
 // ─── Relatório helpers ────────────────────────────────────────────────────────
@@ -1448,6 +1449,7 @@ function ProdutoSimpleModal({ produto, onClose, onSalvo }) {
 export default function CadastrosPage() {
   const { isGerente } = useUser()
   const [aba, setAba] = useState('usuarios')
+  const [ajudaAberta, setAjudaAberta] = useState(false)
 
   const tabContent = {
     usuarios: <UsuariosTab />,
@@ -1466,11 +1468,19 @@ export default function CadastrosPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="font-sans text-3xl font-bold text-foreground">Cadastros</h1>
-        <p className="text-muted-foreground font-body mt-1 text-sm">
-          Gerencie usuários, serviços, produtos e configurações de agenda
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-sans text-3xl font-bold text-foreground">Cadastros</h1>
+          <p className="text-muted-foreground font-body mt-1 text-sm">
+            Gerencie usuários, serviços, produtos e configurações de agenda
+          </p>
+        </div>
+        <button
+          onClick={() => setAjudaAberta(true)}
+          className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors self-start sm:self-auto"
+        >
+          <HelpCircle size={16} /> Ajuda
+        </button>
       </div>
 
       <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
@@ -1493,6 +1503,25 @@ export default function CadastrosPage() {
       <div className="bg-card border border-border rounded-xl p-5 animate-fade-in">
         {tabContent[aba]}
       </div>
+
+      {ajudaAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-sans text-lg font-bold">Ajuda - Cadastros</h3>
+              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground font-body">
+              <p><strong className="text-foreground">Usuários:</strong> cadastre clientes, gerentes e consultoras.</p>
+              <p><strong className="text-foreground">Serviços:</strong> defina nome, preço, duração e visibilidade para consultora.</p>
+              <p><strong className="text-foreground">Produtos:</strong> cadastre itens vendidos e controle estoque inicial/mínimo.</p>
+              <p><strong className="text-foreground">Agenda:</strong> ajuste slots e configurações usadas pelos horários disponíveis.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

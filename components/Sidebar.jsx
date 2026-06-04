@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Package,
   Wallet,
+  Mail,
   Users,
   LogOut,
   Menu,
@@ -26,6 +27,7 @@ const navItemsGerente = [
   { href: '/logado/vendas', label: 'Vendas', icon: ShoppingCart },
   { href: '/logado/estoque', label: 'Estoque', icon: Package },
   { href: '/logado/financeiro', label: 'Financeiro', icon: Wallet },
+  { href: '/logado/campanhas', label: 'Campanhas', icon: Mail },
   { href: '/logado/cadastros', label: 'Cadastros', icon: Users },
 ]
 

@@ -16,6 +16,7 @@ import {
   ArrowRight,
   UserPlus,
   Pencil,
+  HelpCircle,
 } from 'lucide-react'
 
 function formatarData(data) {
@@ -905,6 +906,7 @@ export default function TurmasPage() {
   const [loading, setLoading] = useState(true)
   const [detalhesId, setDetalhesId] = useState(null)
   const [showCodigo, setShowCodigo] = useState(false)
+  const [ajudaAberta, setAjudaAberta] = useState(false)
 
   async function fetchTurmas() {
     setLoading(true)
@@ -1013,15 +1015,25 @@ export default function TurmasPage() {
           </p>
         </div>
 
-        {!isGerente && turmas.length > 0 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowCodigo(true)}
-            className="flex items-center gap-2 text-sm border border-border px-4 py-2 rounded-lg hover:bg-muted self-start sm:self-auto"
+            onClick={() => setAjudaAberta(true)}
+            className="flex items-center gap-2 text-sm border border-border px-4 py-2 rounded-lg hover:bg-muted text-muted-foreground self-start sm:self-auto"
           >
-            <KeyRound size={15} />
-            Entrar por código
+            <HelpCircle size={15} />
+            Ajuda
           </button>
-        )}
+
+          {!isGerente && turmas.length > 0 && (
+            <button
+              onClick={() => setShowCodigo(true)}
+              className="flex items-center gap-2 text-sm border border-border px-4 py-2 rounded-lg hover:bg-muted self-start sm:self-auto"
+            >
+              <KeyRound size={15} />
+              Entrar por código
+            </button>
+          )}
+        </div>
       </div>
 
       {renderConteudo()}
@@ -1040,6 +1052,34 @@ export default function TurmasPage() {
           onClose={() => setShowCodigo(false)}
           onEntrou={fetchTurmas}
         />
+      )}
+
+      {ajudaAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-sans text-lg font-bold">Ajuda - Turmas</h3>
+              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground font-body">
+              <p><strong className="text-foreground">Lista:</strong> cada card mostra serviço, data, horário, status e participantes.</p>
+              {isGerente ? (
+                <>
+                  <p><strong className="text-foreground">Aprovação:</strong> turmas pendentes podem ser aprovadas ou recusadas.</p>
+                  <p><strong className="text-foreground">Código:</strong> copie o convite para enviar aos clientes.</p>
+                  <p><strong className="text-foreground">Detalhes:</strong> veja participantes e edite informações da turma.</p>
+                </>
+              ) : (
+                <>
+                  <p><strong className="text-foreground">Participar:</strong> entre em turmas aprovadas ou use um código de convite.</p>
+                  <p><strong className="text-foreground">Sair:</strong> caso esteja participando, use o botão sair no card.</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

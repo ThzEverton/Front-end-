@@ -12,6 +12,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   SlidersHorizontal,
+  HelpCircle,
 } from 'lucide-react'
 
 function getDataHoje() {
@@ -91,6 +92,7 @@ export default function EstoquePage() {
   const [loadingProdutos, setLoadingProdutos] = useState(true)
   const [loadingMovimentacoes, setLoadingMovimentacoes] = useState(true)
   const [movModal, setMovModal] = useState(null)
+  const [ajudaAberta, setAjudaAberta] = useState(false)
 
   async function fetchProdutos() {
     setLoadingProdutos(true)
@@ -159,6 +161,12 @@ export default function EstoquePage() {
           <h1 className="font-sans text-3xl font-bold text-foreground">Estoque</h1>
           <p className="text-muted-foreground font-body mt-1 text-sm">Controle de produtos e movimentações</p>
         </div>
+        <button
+          onClick={() => setAjudaAberta(true)}
+          className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-sm font-body text-muted-foreground hover:bg-muted transition-colors"
+        >
+          <HelpCircle size={16} /> Ajuda
+        </button>
       </div>
 
       {/* Abas */}
@@ -396,6 +404,25 @@ export default function EstoquePage() {
 
       {movModal && (
         <MovimentacaoModal produto={movModal} onClose={() => setMovModal(null)} onSalvo={atualizarTudo} />
+      )}
+
+      {ajudaAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-sans text-lg font-bold">Ajuda - Estoque</h3>
+              <button onClick={() => setAjudaAberta(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground font-body">
+              <p><strong className="text-foreground">Produtos:</strong> mostra quantidade atual, mínimo, preço e situação do estoque.</p>
+              <p><strong className="text-foreground">Alertas:</strong> produtos críticos aparecem quando estão abaixo ou no mínimo configurado.</p>
+              <p><strong className="text-foreground">Movimentar:</strong> registre entrada, saída ou ajuste manual de estoque.</p>
+              <p><strong className="text-foreground">Movimentações:</strong> histórico de tudo que entrou, saiu ou foi ajustado.</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
