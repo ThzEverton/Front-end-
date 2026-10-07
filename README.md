@@ -1,56 +1,53 @@
-# Sala Rosa – Frontend
+# Sala Rosa — Frontend
 
-Interface do sistema Sala Rosa para gerenciamento de agendamentos, agenda e operações do usuário.
+Frontend do sistema **Sala Rosa**, uma aplicação para gerenciamento de agenda, agendamentos, vendas e operações financeiras.
 
-Aplicação focada em consumo de API REST e controle de estado no cliente.
-
----
+Este repositório representa a camada web do projeto e consome a API disponível no repositório [`Sala-Rosa-back`](https://github.com/ThzEverton/Sala-Rosa-back).
 
 ## Stack
 
-- Next.js
-- React
-- JavaScript
-- CSS / Tailwind (se estiver usando)
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Radix UI
+- React Hook Form
+- Zod
+- Recharts
+- Vercel Analytics
 
----
+## Funcionalidades
 
-## Estrutura
-- app/ → páginas (App Router)
-- components/ → componentes reutilizáveis
-- context/ → contexto global (ex: usuário)
-- hooks/ → hooks customizados
-- lib/ → integrações (api client, configs)
-- utils/ → funções auxiliares
-- styles/ → estilos globais
-- public/ → assets
+- autenticação e sessão do usuário
+- agenda e visualização de horários
+- fluxo de agendamentos
+- operações de vendas
+- indicadores e informações financeiras
+- componentes reutilizáveis e responsivos
+- consumo da API REST do backend
 
+## Organização
 
----
-
-## Funcionamento
-
-- Consome API backend (Sala Rosa)
-- Controle de autenticação via token
-- Renderização baseada em estado do usuário
-- Integração com endpoints de:
-  - agendamento
-  - agenda
-  - financeiro
-  - vendas
-
----
+```text
+app/          rotas e páginas
+components/   componentes reutilizáveis
+context/      estado global
+hooks/        hooks da aplicação
+lib/          integrações e utilitários
+styles/       estilos globais
+utils/        funções auxiliares
+public/       arquivos públicos
+```
 
 ## Autenticação
 
-- Token JWT armazenado no cliente
-- Enviado via:
-  - Authorization Bearer
+As requisições autenticadas utilizam token no padrão `Authorization: Bearer <token>`.
 
----
-
-## Execução
+## Executando localmente
 
 ```bash
 npm install
 npm run dev
+```
+
+A aplicação utiliza App Router e pode ser acessada em `http://localhost:3000` durante o desenvolvimento.
